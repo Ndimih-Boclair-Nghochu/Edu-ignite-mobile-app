@@ -31,8 +31,7 @@
           "image": "./assets/splash-icon.png"
         }
       ],
-      "expo-secure-store",
-      "expo-sharing"
+      "expo-secure-store"
     ]
   }
 }
