@@ -1,10 +1,18 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Text, View } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { HeroCard, Field, Screen, AppButton, Card, SuccessInline } from "@/components/ui";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { RootStackParamList } from "@/navigation/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { palette, theme } from "@/theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 
@@ -39,56 +47,105 @@ export function LoginScreen({ navigation }: Props) {
   }
 
   return (
-    <Screen
-      title="EduIgnite Mobile"
-      subtitle="The same institution backend, redesigned for fast mobile work and offline continuity."
-      scroll={false}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.keyboardFrame}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1, gap: 16 }}
+      <Screen
+        title="EduIgnite Mobile"
+        subtitle="The same institution backend, redesigned for fast mobile work and offline continuity."
+        contentContainerStyle={styles.screenContent}
       >
-        <HeroCard
-          eyebrow="Mobile Workspace"
-          title="Sign in once, keep working anywhere"
-          description="Teachers, school admins, bursars, parents, and learners all enter the same live platform with offline-ready access on the same device."
-        />
+        <View style={styles.stack}>
+          <Card style={styles.formCard}>
+            <Text style={styles.formTitle}>Welcome back</Text>
+            <Text style={styles.formSubtitle}>
+              Sign in with the matricule and password already issued for this account.
+            </Text>
+            <Field
+              label="Matricule"
+              value={matricule}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoComplete="username"
+              textContentType="username"
+              returnKeyType="next"
+              onChangeText={setMatricule}
+              placeholder="Enter account matricule"
+            />
+            <Field
+              label="Password"
+              value={password}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="password"
+              textContentType="password"
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+              onChangeText={setPassword}
+              placeholder="Enter password"
+            />
+            <AppButton label="Login" onPress={handleLogin} loading={loading} />
+            <AppButton
+              label="Activate New Account"
+              variant="ghost"
+              onPress={() => navigation.navigate("Activate")}
+            />
+            {message ? <SuccessInline label={message} /> : null}
+          </Card>
 
-        <Card>
-          <Field
-            label="Matricule"
-            value={matricule}
-            autoCapitalize="characters"
-            onChangeText={setMatricule}
-            placeholder="Enter account matricule"
+          <HeroCard
+            eyebrow="Mobile Workspace"
+            title="Sign in once, keep working anywhere"
+            description="Teachers, school admins, bursars, parents, and learners all enter the same live platform with offline-ready access on the same device."
           />
-          <Field
-            label="Password"
-            value={password}
-            secureTextEntry
-            onChangeText={setPassword}
-            placeholder="Enter password"
-          />
-          <AppButton label="Login" onPress={handleLogin} loading={loading} />
-          <AppButton
-            label="Activate New Account"
-            variant="ghost"
-            onPress={() => navigation.navigate("Activate")}
-          />
-          {message ? <SuccessInline label={message} /> : null}
-        </Card>
 
-        <Card>
-          <Text style={{ fontWeight: "800", color: "#264D73", fontSize: 16 }}>
-            Offline sign-in note
-          </Text>
-          <Text style={{ color: "#667085", lineHeight: 20 }}>
-            The first successful sign-in on a device must happen online. After that, the same
-            device can reopen the account offline, keep using cached data, and queue field updates
-            for later sync.
-          </Text>
-        </Card>
-      </KeyboardAvoidingView>
-    </Screen>
+          <Card>
+            <Text style={styles.noteTitle}>Offline sign-in note</Text>
+            <Text style={styles.noteText}>
+              The first successful sign-in on a device must happen online. After that, the same
+              device can reopen the account offline, keep using cached data, and queue field
+              updates for later sync.
+            </Text>
+          </Card>
+        </View>
+      </Screen>
+    </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  keyboardFrame: {
+    flex: 1,
+  },
+  screenContent: {
+    paddingTop: theme.spacing.sm,
+  },
+  stack: {
+    gap: theme.spacing.lg,
+  },
+  formCard: {
+    gap: theme.spacing.md,
+  },
+  formTitle: {
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: "900",
+    color: palette.primary,
+  },
+  formSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: palette.textMuted,
+  },
+  noteTitle: {
+    fontWeight: "800",
+    color: palette.primary,
+    fontSize: 16,
+  },
+  noteText: {
+    color: palette.textMuted,
+    lineHeight: 20,
+  },
+});

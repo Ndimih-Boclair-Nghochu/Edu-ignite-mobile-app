@@ -64,7 +64,17 @@ export function Screen({
 
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
-      {scroll ? <ScrollView showsVerticalScrollIndicator={false}>{body}</ScrollView> : body}
+      {scroll ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
+          {body}
+        </ScrollView>
+      ) : (
+        body
+      )}
     </SafeAreaView>
   );
 }
@@ -379,6 +389,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
     gap: theme.spacing.lg,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   screenHeader: {
     paddingTop: theme.spacing.sm,
