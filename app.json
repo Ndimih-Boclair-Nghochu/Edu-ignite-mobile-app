@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "EduIgnite Mobile",
+    "slug": "eduignite-mobile-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "eduignite-mobile",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.eduignite.mobileapp"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F0F2F5"
+      },
+      "package": "com.eduignite.mobileapp"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F0F2F5",
+          "image": "./assets/splash-icon.png"
+        }
+      ],
+      "expo-secure-store",
+      "expo-sharing"
+    ]
+  }
+}
