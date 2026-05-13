@@ -58,7 +58,7 @@ export function MessagesScreen() {
   return (
     <Screen
       title="Messages"
-      subtitle="Direct and group conversations, with queued replies continuing offline."
+      subtitle="Direct and group conversations connected to the same shared EduIgnite chat backend."
     >
       <Field
         label="Search"
@@ -91,8 +91,8 @@ export function MessagesScreen() {
                   onPress={() => {
                     if (!isOnline) {
                       Alert.alert(
-                        "Offline",
-                        "Opening a new direct conversation requires connectivity once. Existing conversations still open from cache."
+                        "Temporarily unavailable",
+                        "Opening a new direct conversation requires the backend to be reachable right now."
                       );
                       return;
                     }

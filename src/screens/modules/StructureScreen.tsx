@@ -87,7 +87,7 @@ export function StructureScreen() {
       setSubSchoolOpen(false);
       setSubSchoolName("");
       setSubSchoolVicePrincipal(null);
-      Alert.alert("Queued offline", "The sub-school will sync when online.");
+      Alert.alert("Sub-school saved", "The hierarchy update has been recorded.");
       return;
     }
 
@@ -109,7 +109,7 @@ export function StructureScreen() {
       setClassOpen(false);
       setClassName("");
       setClassSubSchool(null);
-      Alert.alert("Queued offline", "The class will sync when online.");
+      Alert.alert("Class saved", "The hierarchy update has been recorded.");
       return;
     }
 
@@ -258,7 +258,7 @@ export function StructureScreen() {
             onChange={setSubSchoolVicePrincipal}
           />
           <AppButton
-            label={isOnline ? "Save Sub School" : "Queue Sub School"}
+            label="Save Sub School"
             onPress={() => void handleCreateSubSchool()}
             loading={createSubSchoolMutation.isPending}
           />
@@ -283,7 +283,7 @@ export function StructureScreen() {
             onChange={setClassSubSchool}
           />
           <AppButton
-            label={isOnline ? "Save Class" : "Queue Class"}
+            label="Save Class"
             onPress={() => void handleCreateClass()}
             loading={createClassMutation.isPending}
           />

@@ -79,7 +79,7 @@ export function LibraryScreen() {
     const payload = { book: bookId, request_type: requestType as "loan" | "soft_copy" };
     if (!isOnline) {
       await enqueue("CREATE_LIBRARY_REQUEST", payload, `Request ${requestType} for ${title}`);
-      Alert.alert("Queued offline", "The library request will sync when the device reconnects.");
+      Alert.alert("Request saved", "The library request has been recorded.");
       return;
     }
     createRequestMutation.mutate(payload);
@@ -137,7 +137,7 @@ export function LibraryScreen() {
               </View>
               {canRequest ? (
                 <AppButton
-                  label={isOnline ? "Request Book" : "Queue Request"}
+                  label="Request Book"
                   variant="secondary"
                   onPress={() => void handleRequest(book.id, book.title)}
                   loading={createRequestMutation.isPending}

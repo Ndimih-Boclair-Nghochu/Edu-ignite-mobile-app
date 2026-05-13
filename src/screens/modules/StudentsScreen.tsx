@@ -18,7 +18,8 @@ import {
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { studentsService } from "@/lib/api/services/students.service";
-import { CreateStudentRequest } from "@/lib/api/types";
+import { usersService } from "@/lib/api/services/users.service";
+import { CreateStudentRequest, User } from "@/lib/api/types";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDate } from "@/lib/utils/format";
 import { useAuth } from "@/providers/AuthProvider";
@@ -39,6 +40,19 @@ type StudentFormState = {
   parent_name: string;
   parent_email: string;
   parent_phone: string;
+};
+
+type RegistryStudentCard = {
+  key: string;
+  id: string;
+  user: User;
+  admissionNumber: string;
+  studentClass: string;
+  guardianName: string;
+  admissionDate?: string;
+  parentCount: number;
+  isOnHonourRoll: boolean;
+  hasProfile: boolean;
 };
 
 const defaultForm: StudentFormState = {
@@ -66,26 +80,56 @@ export function StudentsScreen() {
   const summaryQuery = useQuery({
     queryKey: queryKeys.students.summary,
     queryFn: () => studentsService.getRegistrySummary(),
+    enabled: Boolean(user),
   });
 
   const studentsQuery = useQuery({
-    queryKey: queryKeys.students.list({ limit: 200 }),
-    queryFn: () => studentsService.getStudents({ limit: 200 }),
+    queryKey: queryKeys.students.list({ page_size: 500 }),
+    queryFn: () => studentsService.getStudents({ page_size: 500 }),
+    enabled: Boolean(user),
   });
 
   const honourRollQuery = useQuery({
     queryKey: queryKeys.students.honourRoll,
-    queryFn: () => studentsService.getHonourRoll({ limit: 50 }),
+    queryFn: () => studentsService.getHonourRoll({ page_size: 50 }),
+    enabled: Boolean(user),
   });
 
   const classesQuery = useQuery({
     queryKey: queryKeys.schools.classes(),
     queryFn: () => schoolsService.getHierarchyClasses(),
+    enabled: Boolean(user),
   });
 
   const schoolQuery = useQuery({
     queryKey: queryKeys.schools.me,
     queryFn: () => schoolsService.getMySchool(),
+    enabled: Boolean(user),
+  });
+
+  const schoolId = schoolQuery.data?.id || user?.school?.id || "";
+
+  const studentUsersQuery = useQuery({
+    queryKey: ["users", "school", schoolId, "students"],
+    queryFn: () =>
+      usersService.getUsersBySchool(schoolId, {
+        role: "STUDENT",
+        ordering: "name",
+        page_size: 500,
+      }),
+    enabled: Boolean(schoolId),
+  });
+
+  const parentsQuery = useQuery({
+    queryKey: ["users", "school", schoolId, "parents"],
+    queryFn: () =>
+      usersService.getUsers({
+        role: "PARENT",
+        school_id: schoolId,
+        ordering: "name",
+        page_size: 500,
+      }),
+    enabled: Boolean(schoolId),
   });
 
   const createStudentMutation = useMutation({
@@ -97,6 +141,8 @@ export function StudentsScreen() {
       setFormOpen(false);
       await Promise.all([
         studentsQuery.refetch(),
+        studentUsersQuery.refetch(),
+        parentsQuery.refetch(),
         summaryQuery.refetch(),
         honourRollQuery.refetch(),
       ]);
@@ -112,20 +158,84 @@ export function StudentsScreen() {
     [classesQuery.data, selectedClassId]
   );
 
-  const filteredStudents = useMemo(() => {
-    const keyword = deferredSearch.trim().toLowerCase();
-    const rows = studentsQuery.data?.results ?? [];
-    if (!keyword) {
-      return rows;
+  const registryCards = useMemo<RegistryStudentCard[]>(() => {
+    const profileByUserId = new Map(
+      (studentsQuery.data?.results ?? [])
+        .filter((entry) => entry.user?.id)
+        .map((entry) => [entry.user.id, entry] as const)
+    );
+
+    const rows: RegistryStudentCard[] = (studentsQuery.data?.results ?? []).map((student) => ({
+      key: student.id,
+      id: student.id,
+      user: student.user,
+      admissionNumber: student.admission_number,
+      studentClass: student.school_class_name || student.student_class || "Class pending",
+      guardianName: student.guardian_name || "Guardian pending",
+      admissionDate: student.admission_date,
+      parentCount: student.parent_count ?? 0,
+      isOnHonourRoll: Boolean(student.is_on_honour_roll),
+      hasProfile: true,
+    }));
+
+    for (const entry of studentUsersQuery.data?.results ?? []) {
+      if (profileByUserId.has(entry.id)) {
+        continue;
+      }
+
+      rows.push({
+        key: `user-${entry.id}`,
+        id: entry.id,
+        user: entry,
+        admissionNumber: entry.matricule || "Profile pending",
+        studentClass: entry.student_class || "Class pending",
+        guardianName: "Guardian pending",
+        admissionDate: entry.date_joined,
+        parentCount: 0,
+        isOnHonourRoll: false,
+        hasProfile: false,
+      });
     }
 
-    return rows.filter((student) => {
-      const haystack = `${student.user?.name ?? ""} ${student.user?.email ?? ""} ${student.admission_number ?? ""} ${student.user?.matricule ?? ""}`.toLowerCase();
-      return haystack.includes(keyword);
-    });
-  }, [deferredSearch, studentsQuery.data?.results]);
+    return rows;
+  }, [studentUsersQuery.data?.results, studentsQuery.data?.results]);
+
+  const filteredStudents = useMemo(() => {
+    const keyword = deferredSearch.trim().toLowerCase();
+    if (!keyword) {
+      return registryCards;
+    }
+
+    return registryCards.filter((student) =>
+      `${student.user?.name ?? ""} ${student.user?.email ?? ""} ${student.admissionNumber ?? ""} ${student.user?.matricule ?? ""}`
+        .toLowerCase()
+        .includes(keyword)
+    );
+  }, [deferredSearch, registryCards]);
 
   const honourLearners = honourRollQuery.data?.results ?? [];
+  const activeEnrollment = Math.max(
+    Number(summaryQuery.data?.active_enrollment || 0),
+    Number(summaryQuery.data?.student_profiles || 0),
+    studentsQuery.data?.count ?? 0,
+    studentsQuery.data?.results?.length ?? 0,
+    studentUsersQuery.data?.count ?? 0,
+    studentUsersQuery.data?.results?.length ?? 0,
+    Number(schoolQuery.data?.student_count || 0)
+  );
+  const parentAccounts = Math.max(
+    Number(summaryQuery.data?.parent_accounts || 0),
+    parentsQuery.data?.count ?? 0,
+    parentsQuery.data?.results?.length ?? 0
+  );
+  const linkedStudents = Math.max(
+    Number(summaryQuery.data?.students_linked || 0),
+    (studentsQuery.data?.results ?? []).filter((entry) => (entry.parent_count ?? 0) > 0).length
+  );
+  const honourCount = Math.max(
+    Number(summaryQuery.data?.honour_roll_count || 0),
+    honourLearners.length
+  );
 
   async function handleCreateStudent() {
     if (!form.name.trim() || !form.guardian_name.trim() || !form.guardian_phone.trim()) {
@@ -149,7 +259,7 @@ export function StudentsScreen() {
       setForm(defaultForm);
       setSelectedClassId(null);
       setFormOpen(false);
-      Alert.alert("Saved offline", "The admission has been queued and will sync when online.");
+      Alert.alert("Student saved", "The student registration has been recorded.");
       return;
     }
 
@@ -160,40 +270,19 @@ export function StudentsScreen() {
     <Screen
       title="Students"
       subtitle="Admissions, guardian links, parent onboarding, and honour-roll visibility."
-      rightAction={
-        canCreate ? (
-          <AppButton compact label="Register" onPress={() => setFormOpen(true)} />
-        ) : undefined
-      }
+      rightAction={canCreate ? <AppButton compact label="Register" onPress={() => setFormOpen(true)} /> : undefined}
     >
       <HeroCard
         eyebrow={schoolQuery.data?.short_name ?? "Student Registry"}
         title={schoolQuery.data?.name ?? "School student registry"}
-        description="Keep the learner registry clean, school-scoped, and ready for parent linkage on the same backend used by the web dashboard."
+        description="Keep the learner registry clean, school-scoped, and ready for parent linkage across the shared institution workspace."
       />
 
       <View style={{ gap: 12 }}>
-        <StatCard
-          label="Active Enrollment"
-          value={summaryQuery.data?.active_enrollment ?? 0}
-          helper="Students linked to this school."
-        />
-        <StatCard
-          label="Parent Accounts"
-          value={summaryQuery.data?.parent_accounts ?? 0}
-          helper="Parent logins inside the same school scope."
-        />
-        <StatCard
-          label="Students Linked"
-          value={summaryQuery.data?.students_linked ?? 0}
-          helper="Learners already tied to at least one parent."
-          tone="success"
-        />
-        <StatCard
-          label="Honour Roll"
-          value={summaryQuery.data?.honour_roll_count ?? 0}
-          helper="Learners above the honour threshold."
-        />
+        <StatCard label="Active Enrollment" value={activeEnrollment} helper="Students linked to this school." />
+        <StatCard label="Parent Accounts" value={parentAccounts} helper="Parent logins inside the same school scope." />
+        <StatCard label="Students Linked" value={linkedStudents} helper="Learners already tied to at least one parent." tone="success" />
+        <StatCard label="Honour Roll" value={honourCount} helper="Learners above the honour threshold." />
       </View>
 
       <Field
@@ -204,30 +293,31 @@ export function StudentsScreen() {
       />
 
       <SectionTitle title="Student Registry" subtitle="All learners currently visible inside this school." />
-      {studentsQuery.isLoading && !studentsQuery.data ? (
+      {studentsQuery.isLoading && studentUsersQuery.isLoading && !filteredStudents.length ? (
         <LoadingState label="Loading student registry..." />
       ) : filteredStudents.length ? (
         <View style={{ gap: 12 }}>
           {filteredStudents.map((student) => (
-            <Card key={student.id}>
+            <Card key={student.key}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>
                     {student.user?.name ?? "Student"}
                   </Text>
                   <Text style={{ color: "#667085", lineHeight: 19 }}>
-                    {student.user?.matricule || "No matricule yet"} • {student.admission_number}
+                    {student.user?.matricule || "No matricule yet"} • {student.admissionNumber}
                   </Text>
                   <Text style={{ color: "#667085", lineHeight: 19 }}>
-                    {student.school_class_name || student.student_class} • Guardian: {student.guardian_name}
+                    {student.studentClass} • Guardian: {student.guardianName}
                   </Text>
                   <Text style={{ color: "#667085", lineHeight: 19 }}>
-                    Admission date: {formatDate(student.admission_date)}
+                    Admission date: {formatDate(student.admissionDate)}
                   </Text>
                 </View>
                 <View style={{ gap: 8, alignItems: "flex-end" }}>
-                  <Tag label={`${student.parent_count ?? 0} parent`} />
-                  {student.is_on_honour_roll ? <Tag label="Honour" tone="success" /> : null}
+                  <Tag label={`${student.parentCount ?? 0} parent`} />
+                  {!student.hasProfile ? <Tag label="Profile Pending" tone="warning" /> : null}
+                  {student.isOnHonourRoll ? <Tag label="Honour" tone="success" /> : null}
                 </View>
               </View>
             </Card>
@@ -236,7 +326,7 @@ export function StudentsScreen() {
       ) : (
         <EmptyState
           title="No students found"
-          description="The current cache does not contain any learner matching this search."
+          description="The current registry does not contain any learner matching this search."
         />
       )}
 
@@ -262,7 +352,7 @@ export function StudentsScreen() {
       ) : (
         <EmptyState
           title="No honour-roll learners yet"
-          description="The mobile cache does not show any learner above the school threshold right now."
+          description="No learner currently meets the school honour threshold."
         />
       )}
 
@@ -331,7 +421,7 @@ export function StudentsScreen() {
             placeholder="Parent phone"
           />
           <AppButton
-            label={isOnline ? "Create Student" : "Queue Admission"}
+            label="Create Student"
             onPress={() => void handleCreateStudent()}
             loading={createStudentMutation.isPending}
           />

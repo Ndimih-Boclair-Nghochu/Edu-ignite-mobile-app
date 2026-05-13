@@ -33,12 +33,8 @@ export function LoginScreen({ navigation }: Props) {
     setMessage(null);
 
     try {
-      const response = await signIn(matricule.trim(), password);
-      setMessage(
-        response.mode === "offline"
-          ? "Signed in with the last verified local session. Pending work will sync when the device reconnects."
-          : "You are connected to the live EduIgnite backend."
-      );
+      await signIn(matricule.trim(), password);
+      setMessage("You are signed in and ready to continue.");
     } catch (error) {
       Alert.alert("Login failed", getApiErrorMessage(error));
     } finally {
@@ -53,7 +49,7 @@ export function LoginScreen({ navigation }: Props) {
     >
       <Screen
         title="EduIgnite Mobile"
-        subtitle="The same institution backend, redesigned for fast mobile work and offline continuity."
+        subtitle="The same institution backend, redesigned for fast and reliable mobile work."
         contentContainerStyle={styles.screenContent}
       >
         <View style={styles.stack}>
@@ -98,17 +94,8 @@ export function LoginScreen({ navigation }: Props) {
           <HeroCard
             eyebrow="Mobile Workspace"
             title="Sign in once, keep working anywhere"
-            description="Teachers, school admins, bursars, parents, and learners all enter the same live platform with offline-ready access on the same device."
+            description="Teachers, school admins, bursars, parents, and learners all enter the same live platform from one professional mobile workspace."
           />
-
-          <Card>
-            <Text style={styles.noteTitle}>Offline sign-in note</Text>
-            <Text style={styles.noteText}>
-              The first successful sign-in on a device must happen online. After that, the same
-              device can reopen the account offline, keep using cached data, and queue field
-              updates for later sync.
-            </Text>
-          </Card>
         </View>
       </Screen>
     </KeyboardAvoidingView>
@@ -138,14 +125,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: palette.textMuted,
-  },
-  noteTitle: {
-    fontWeight: "800",
-    color: palette.primary,
-    fontSize: 16,
-  },
-  noteText: {
-    color: palette.textMuted,
-    lineHeight: 20,
   },
 });

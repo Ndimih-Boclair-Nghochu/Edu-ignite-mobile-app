@@ -1,30 +1,43 @@
 import {
+  Bot,
   Bell,
   BookOpen,
   Building2,
+  CalendarDays,
+  ClipboardList,
+  Cpu,
   CreditCard,
   GraduationCap,
   Library,
+  LucideIcon,
   MessagesSquare,
+  NotebookPen,
+  Users,
   UserRoundCheck,
 } from "lucide-react-native";
-import { UserRole } from "@/lib/api/types";
 
 export type ModuleRoute =
   | "Students"
+  | "Staff"
+  | "Subjects"
   | "Fees"
   | "Announcements"
   | "Attendance"
   | "Library"
-  | "Structure";
+  | "Structure"
+  | "Exams"
+  | "Assignments"
+  | "LiveClasses"
+  | "Community"
+  | "AI";
 
 export type AppModule = {
   key: ModuleRoute;
   title: string;
   description: string;
   route: ModuleRoute;
-  icon: typeof GraduationCap;
-  roles: UserRole[];
+  icon: LucideIcon;
+  group: "registry" | "academics" | "operations" | "insights";
 };
 
 export const APP_MODULES: AppModule[] = [
@@ -34,7 +47,23 @@ export const APP_MODULES: AppModule[] = [
     description: "Admissions, guardians, parent links, and honour-roll tracking.",
     route: "Students",
     icon: GraduationCap,
-    roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"],
+    group: "registry",
+  },
+  {
+    key: "Staff",
+    title: "Staff",
+    description: "Leadership, teachers, bursars, librarians, and staff remarks.",
+    route: "Staff",
+    icon: Users,
+    group: "registry",
+  },
+  {
+    key: "Subjects",
+    title: "Institutional Subjects",
+    description: "Academic subjects, class allocations, sequences, and enrolments.",
+    route: "Subjects",
+    icon: NotebookPen,
+    group: "academics",
   },
   {
     key: "Fees",
@@ -42,7 +71,7 @@ export const APP_MODULES: AppModule[] = [
     description: "Class fee allocation, student balances, and PDF fee reports.",
     route: "Fees",
     icon: CreditCard,
-    roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "BURSAR"],
+    group: "operations",
   },
   {
     key: "Announcements",
@@ -50,23 +79,15 @@ export const APP_MODULES: AppModule[] = [
     description: "School notices, pinned information, and role-targeted updates.",
     route: "Announcements",
     icon: Bell,
-    roles: [
-      "SCHOOL_ADMIN",
-      "SUB_ADMIN",
-      "TEACHER",
-      "STUDENT",
-      "PARENT",
-      "BURSAR",
-      "LIBRARIAN",
-    ],
+    group: "operations",
   },
   {
     key: "Attendance",
     title: "Attendance",
-    description: "Live class attendance, daily tracking, and offline roll calls.",
+    description: "Live class attendance, daily tracking, and school attendance history.",
     route: "Attendance",
     icon: UserRoundCheck,
-    roles: ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "STUDENT", "PARENT"],
+    group: "operations",
   },
   {
     key: "Library",
@@ -74,31 +95,60 @@ export const APP_MODULES: AppModule[] = [
     description: "Books, stock visibility, requests, and borrower follow-up.",
     route: "Library",
     icon: Library,
-    roles: [
-      "SCHOOL_ADMIN",
-      "SUB_ADMIN",
-      "TEACHER",
-      "STUDENT",
-      "PARENT",
-      "LIBRARIAN",
-    ],
+    group: "operations",
   },
   {
     key: "Structure",
-    title: "School Structure",
+    title: "Hierarchy & Sections",
     description: "Sub-schools, sections, staff allocation, and class hierarchy.",
     route: "Structure",
     icon: Building2,
-    roles: ["SCHOOL_ADMIN", "SUB_ADMIN"],
+    group: "registry",
+  },
+  {
+    key: "Exams",
+    title: "Exams & Schedules",
+    description: "Exam sessions, submissions, and timetable visibility.",
+    route: "Exams",
+    icon: CalendarDays,
+    group: "academics",
+  },
+  {
+    key: "Assignments",
+    title: "Assignments",
+    description: "Assignments, submissions, and grading snapshots.",
+    route: "Assignments",
+    icon: ClipboardList,
+    group: "academics",
+  },
+  {
+    key: "LiveClasses",
+    title: "Live Classes",
+    description: "Live sessions, upcoming classes, and meeting access points.",
+    route: "LiveClasses",
+    icon: MessagesSquare,
+    group: "academics",
+  },
+  {
+    key: "Community",
+    title: "Community & Support",
+    description: "Blogs, feedback, testimonies, and support contributions.",
+    route: "Community",
+    icon: BookOpen,
+    group: "insights",
+  },
+  {
+    key: "AI",
+    title: "AI Assistant",
+    description: "Platform insights, AI requests, and direct assistant conversations.",
+    route: "AI",
+    icon: Bot,
+    group: "insights",
   },
 ];
 
-export function getModulesForRole(role?: UserRole | null) {
-  if (!role) {
-    return [];
-  }
-
-  return APP_MODULES.filter((module) => module.roles.includes(role));
+export function getModulesForRole() {
+  return APP_MODULES;
 }
 
 export const MESSAGE_ICON = MessagesSquare;

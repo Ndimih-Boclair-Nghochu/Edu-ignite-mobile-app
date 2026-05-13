@@ -7,6 +7,7 @@ import { ArrowRight } from "lucide-react-native";
 import { AppButton, Card, HeroCard, LoadingState, Screen, SectionTitle, StatCard, Tag } from "@/components/ui";
 import { getModulesForRole } from "@/features/modules";
 import { announcementsService } from "@/lib/api/services/announcements.service";
+import { attendanceService } from "@/lib/api/services/attendance.service";
 import { feesService } from "@/lib/api/services/fees.service";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { studentsService } from "@/lib/api/services/students.service";
@@ -15,15 +16,13 @@ import { queryKeys } from "@/lib/queryKeys";
 import { formatMoney, formatRole } from "@/lib/utils/format";
 import { RootStackParamList } from "@/navigation/types";
 import { useAuth } from "@/providers/AuthProvider";
-import { useSync } from "@/providers/SyncProvider";
 
 const STAFF_ROLES = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "BURSAR", "LIBRARIAN"];
 
 export function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user, isOfflineSession } = useAuth();
-  const { queue } = useSync();
-  const modules = getModulesForRole(user?.role);
+  const { user } = useAuth();
+  const modules = getModulesForRole();
 
   const schoolQuery = useQuery({
     queryKey: queryKeys.schools.me,
@@ -31,22 +30,40 @@ export function DashboardScreen() {
     enabled: Boolean(user),
   });
 
+  const schoolId = schoolQuery.data?.id || user?.school?.id || "";
+
   const registrySummaryQuery = useQuery({
     queryKey: queryKeys.students.summary,
     queryFn: () => studentsService.getRegistrySummary(),
-    enabled: Boolean(user && ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"].includes(user.role)),
+    enabled: Boolean(user),
+  });
+
+  const studentsQuery = useQuery({
+    queryKey: queryKeys.students.list({ page_size: 500 }),
+    queryFn: () => studentsService.getStudents({ page_size: 500 }),
+    enabled: Boolean(user),
   });
 
   const feeSummaryQuery = useQuery({
     queryKey: queryKeys.fees.summary(),
     queryFn: () => feesService.getSchoolFeeSummary(),
-    enabled: Boolean(user && ["SCHOOL_ADMIN", "SUB_ADMIN", "BURSAR"].includes(user.role)),
+    enabled: Boolean(user),
   });
 
   const usersQuery = useQuery({
-    queryKey: queryKeys.users.list({ limit: 200 }),
-    queryFn: () => usersService.getUsers({ limit: 200 }),
-    enabled: Boolean(user && ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"].includes(user.role)),
+    queryKey: ["users", "school", schoolId, "staff"],
+    queryFn: () =>
+      usersService.getUsersBySchool(schoolId, {
+        role: STAFF_ROLES.join(","),
+        page_size: 500,
+      }),
+    enabled: Boolean(user && schoolId),
+  });
+
+  const attendanceQuery = useQuery({
+    queryKey: queryKeys.attendance.records({ limit: 500 }),
+    queryFn: () => attendanceService.getAttendanceRecords({ limit: 500 }),
+    enabled: Boolean(user),
   });
 
   const announcementsQuery = useQuery({
@@ -56,33 +73,77 @@ export function DashboardScreen() {
   });
 
   const staffCount = useMemo(() => {
-    return (usersQuery.data?.results ?? []).filter((staff) => STAFF_ROLES.includes(staff.role)).length;
-  }, [usersQuery.data?.results]);
+    return Math.max(
+      (usersQuery.data?.results ?? []).filter((staff) => STAFF_ROLES.includes(staff.role)).length,
+      usersQuery.data?.count ?? 0,
+      Number(schoolQuery.data?.teacher_count || 0)
+    );
+  }, [schoolQuery.data?.teacher_count, usersQuery.data?.count, usersQuery.data?.results]);
+
+  const totalStudents = useMemo(() => {
+    return Math.max(
+      Number(registrySummaryQuery.data?.active_enrollment || 0),
+      Number(registrySummaryQuery.data?.student_profiles || 0),
+      studentsQuery.data?.count ?? 0,
+      studentsQuery.data?.results?.length ?? 0,
+      Number(schoolQuery.data?.student_count || 0)
+    );
+  }, [registrySummaryQuery.data, schoolQuery.data?.student_count, studentsQuery.data]);
+
+  const attendanceHealth = useMemo(() => {
+    const rows = attendanceQuery.data?.results ?? [];
+    if (!rows.length) {
+      return 0;
+    }
+
+    const classBuckets = rows.reduce<Record<string, { total: number; present: number }>>(
+      (accumulator, record) => {
+        const className = record.student?.student_class || "Unassigned";
+        if (!accumulator[className]) {
+          accumulator[className] = { total: 0, present: 0 };
+        }
+        accumulator[className].total += 1;
+        if (["Present", "Late", "present", "late"].includes(record.status)) {
+          accumulator[className].present += 1;
+        }
+        return accumulator;
+      },
+      {}
+    );
+
+    const classRates = Object.values(classBuckets).map((bucket) =>
+      bucket.total ? Math.round((bucket.present / bucket.total) * 100) : 0
+    );
+
+    return classRates.length
+      ? Math.round(classRates.reduce((sum, value) => sum + value, 0) / classRates.length)
+      : 0;
+  }, [attendanceQuery.data?.results]);
 
   const highlightCards = useMemo(() => {
-    const registry = registrySummaryQuery.data;
-    const fees = feeSummaryQuery.data?.filtered_totals;
+    const schoolTotals = feeSummaryQuery.data?.school_totals;
+    const filteredTotals = feeSummaryQuery.data?.filtered_totals;
 
     if (user?.role === "BURSAR") {
       return [
         {
           label: "Classes Covered",
-          value: feeSummaryQuery.data?.filtered_totals.class_count ?? 0,
+          value: filteredTotals?.class_count ?? 0,
           helper: "School fee assignments currently active.",
         },
         {
           label: "Total Expected",
-          value: formatMoney(fees?.total_expected),
+          value: formatMoney(filteredTotals?.total_expected),
           helper: "Amount expected from all assigned classes.",
         },
         {
           label: "Collected",
-          value: formatMoney(fees?.total_collected),
+          value: formatMoney(filteredTotals?.total_collected),
           helper: "Amount already recorded by the bursar desk.",
         },
         {
           label: "Outstanding",
-          value: formatMoney(fees?.total_outstanding),
+          value: formatMoney(filteredTotals?.total_outstanding),
           helper: "Balance still left to recover across classes.",
         },
       ];
@@ -91,7 +152,7 @@ export function DashboardScreen() {
     return [
       {
         label: "Active Enrollment",
-        value: registry?.active_enrollment ?? schoolQuery.data?.student_count ?? 0,
+        value: totalStudents,
         helper: "Learners linked to this school.",
       },
       {
@@ -100,38 +161,38 @@ export function DashboardScreen() {
         helper: "Teachers, admins, bursars, and librarians in scope.",
       },
       {
-        label: "Collected Fees",
-        value: formatMoney(fees?.total_collected),
+        label: "Total Revenue",
+        value: formatMoney(schoolTotals?.total_collected ?? filteredTotals?.total_collected),
         helper: "Live school-fee amount recorded in the ledger.",
       },
       {
-        label: "Pending Sync",
-        value: queue.length,
-        helper: "Queued offline changes waiting for connectivity.",
+        label: "Attendance Health",
+        value: `${attendanceHealth}%`,
+        helper: "Average attendance across recorded class activity.",
       },
     ];
   }, [
+    attendanceHealth,
     feeSummaryQuery.data?.filtered_totals,
-    queue.length,
-    registrySummaryQuery.data,
-    schoolQuery.data?.student_count,
+    feeSummaryQuery.data?.school_totals,
     staffCount,
+    totalStudents,
     user?.role,
   ]);
 
   return (
     <Screen
       title="Overview"
-      subtitle="A mobile snapshot of the same EduIgnite institution backend used on web."
+      subtitle="A live mobile view of the same institution records, counts, and backend workflows used on web."
     >
       <HeroCard
         eyebrow={schoolQuery.data?.short_name ?? user?.matricule ?? "EduIgnite"}
         title={schoolQuery.data?.name ?? user?.name ?? "EduIgnite Node"}
-        description={`${formatRole(user?.role)} workspace with ${isOfflineSession ? "offline continuity enabled" : "live backend sync active"}.`}
+        description={`${formatRole(user?.role)} workspace connected to the same shared school dataset used across the web platform.`}
       >
         <View style={{ flexDirection: "row", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
           <Tag label={user?.role ?? "User"} />
-          <Tag label={isOfflineSession ? "Offline Session" : "Live Session"} tone={isOfflineSession ? "warning" : "success"} />
+          {schoolQuery.data?.short_name ? <Tag label={schoolQuery.data.short_name} tone="success" /> : null}
         </View>
       </HeroCard>
 
@@ -149,10 +210,10 @@ export function DashboardScreen() {
 
       <SectionTitle
         title="Quick Modules"
-        subtitle="Jump into the operational areas that belong to this account."
+        subtitle="Open the same major work areas available from the shared EduIgnite institution workspace."
       />
       <View style={{ gap: 12 }}>
-        {modules.slice(0, 4).map((module) => {
+        {modules.slice(0, 8).map((module) => {
           const Icon = module.icon;
           return (
             <Card key={module.key}>
@@ -208,11 +269,11 @@ export function DashboardScreen() {
           />
         </View>
       ) : (
-        <Card>
-          <Text style={{ color: "#667085", lineHeight: 20 }}>
-            No recent announcement is cached for this account yet.
-          </Text>
-        </Card>
+          <Card>
+            <Text style={{ color: "#667085", lineHeight: 20 }}>
+              No recent announcement is available for this account yet.
+            </Text>
+          </Card>
       )}
 
       {schoolQuery.isLoading && !schoolQuery.data ? (

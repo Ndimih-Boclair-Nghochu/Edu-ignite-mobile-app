@@ -1,16 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import { Alert, Text, View } from "react-native";
-import { AppButton, Card, HeroCard, Screen, SectionTitle, Tag, UserAvatar } from "@/components/ui";
+import { AppButton, Card, HeroCard, Screen, SectionTitle, UserAvatar } from "@/components/ui";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatRole } from "@/lib/utils/format";
 import { useAuth } from "@/providers/AuthProvider";
-import { useSync } from "@/providers/SyncProvider";
 
 export function ProfileScreen() {
   const { refreshProfile, signOut, user } = useAuth();
-  const { isOnline, queue } = useSync();
 
   const schoolQuery = useQuery({
     queryKey: queryKeys.schools.me,
@@ -24,12 +22,7 @@ export function ProfileScreen() {
         eyebrow={formatRole(user?.role)}
         title={user?.name ?? "EduIgnite User"}
         description={user?.email || "Account email not available"}
-      >
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-          <Tag label={isOnline ? "Online" : "Offline"} tone={isOnline ? "success" : "warning"} />
-          <Tag label={`${queue.length} queued`} />
-        </View>
-      </HeroCard>
+      />
 
       <Card>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
@@ -60,7 +53,7 @@ export function ProfileScreen() {
       </Card>
 
       <Card>
-        <SectionTitle title="Session Controls" subtitle="Refresh the profile or clear this local session." />
+        <SectionTitle title="Session Controls" subtitle="Refresh the latest backend profile or clear this device session." />
         <AppButton
           label="Refresh My Profile"
           variant="secondary"

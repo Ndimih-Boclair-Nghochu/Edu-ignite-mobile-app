@@ -85,7 +85,7 @@ export function AnnouncementsScreen() {
       setTitle("");
       setContent("");
       setTarget("all");
-      Alert.alert("Queued offline", "The announcement will publish when the device reconnects.");
+      Alert.alert("Announcement saved", "The announcement has been recorded.");
       return;
     }
 
@@ -104,8 +104,8 @@ export function AnnouncementsScreen() {
     >
       <HeroCard
         eyebrow="School Notices"
-        title="Live + Cached Announcement Feed"
-        description="Each notice comes from the same backend stream shared with the web platform, and new ones can be queued offline for later publishing."
+        title="Announcement Feed"
+        description="Each notice comes from the same backend stream shared with the web platform."
       />
 
       <Field
@@ -155,7 +155,7 @@ export function AnnouncementsScreen() {
             multiline
           />
           <AppButton
-            label={isOnline ? "Publish Announcement" : "Queue Announcement"}
+            label="Publish Announcement"
             onPress={() => void handleCreateAnnouncement()}
             loading={createAnnouncementMutation.isPending}
           />

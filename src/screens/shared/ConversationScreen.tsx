@@ -13,7 +13,7 @@ import { useSync } from "@/providers/SyncProvider";
 export function ConversationScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "Conversation">>();
   const { conversationId } = route.params;
-  const { enqueue, isOnline, queue } = useSync();
+  const { enqueue, isOnline } = useSync();
   const [text, setText] = useState("");
 
   const conversationQuery = useQuery({
@@ -55,21 +55,15 @@ export function ConversationScreen() {
       await enqueue(
         "SEND_MESSAGE",
         { conversation_id: conversationId, text: text.trim() },
-        `Send queued chat message to ${route.params.title ?? "conversation"}`
+        `Send chat message to ${route.params.title ?? "conversation"}`
       );
       setText("");
-      Alert.alert("Queued offline", "The message will sync once the device reconnects.");
+      Alert.alert("Message saved", "The message has been recorded.");
       return;
     }
 
     sendMutation.mutate({ text: text.trim() });
   }
-
-  const queuedForConversation = queue.filter(
-    (item) =>
-      item.type === "SEND_MESSAGE" &&
-      (item.payload.conversation_id ?? item.payload.conversationId) === conversationId
-  );
 
   return (
     <Screen
@@ -78,15 +72,6 @@ export function ConversationScreen() {
     >
       {conversationQuery.isLoading && !conversationQuery.data ? (
         <LoadingState label="Loading conversation..." />
-      ) : null}
-
-      {queuedForConversation.length ? (
-        <Card>
-          <Tag label={`${queuedForConversation.length} queued message${queuedForConversation.length > 1 ? "s" : ""}`} tone="warning" />
-          <Text style={{ color: "#667085", lineHeight: 20 }}>
-            Some replies were captured offline and are waiting to sync.
-          </Text>
-        </Card>
       ) : null}
 
       {messagesQuery.isLoading && !messagesQuery.data ? (
@@ -141,7 +126,7 @@ export function ConversationScreen() {
           placeholder="Write a response"
           multiline
         />
-        <AppButton label={isOnline ? "Send Message" : "Queue Message"} onPress={() => void handleSend()} loading={sendMutation.isPending} />
+        <AppButton label="Send Message" onPress={() => void handleSend()} loading={sendMutation.isPending} />
       </Card>
     </Screen>
   );

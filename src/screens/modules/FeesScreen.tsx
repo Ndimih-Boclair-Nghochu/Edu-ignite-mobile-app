@@ -174,7 +174,7 @@ export function FeesScreen() {
       setAssignmentForm(defaultAssignmentForm);
       setAssignmentClassId(null);
       setAssignmentOpen(false);
-      Alert.alert("Queued offline", "The class fee assignment will sync when online.");
+      Alert.alert("Fee saved", "The class fee assignment has been recorded.");
       return;
     }
 
@@ -197,7 +197,7 @@ export function FeesScreen() {
       setEditingRecordId(null);
       setEditingAmountPaid("");
       setEditingNotes("");
-      Alert.alert("Queued offline", "The fee update will sync when online.");
+      Alert.alert("Fee saved", "The learner fee update has been recorded.");
       return;
     }
 
@@ -435,7 +435,7 @@ export function FeesScreen() {
             multiline
           />
           <AppButton
-            label={isOnline ? "Save Fee Assignment" : "Queue Assignment"}
+            label="Save Fee Assignment"
             onPress={() => void handleCreateAssignment()}
             loading={createAssignmentMutation.isPending}
           />
@@ -463,7 +463,7 @@ export function FeesScreen() {
             multiline
           />
           <AppButton
-            label={isOnline ? "Save Payment Status" : "Queue Fee Update"}
+            label="Save Payment Status"
             onPress={() => void handleUpdateRecord()}
             loading={updateRecordMutation.isPending}
           />

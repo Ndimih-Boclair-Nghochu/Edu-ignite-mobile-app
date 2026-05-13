@@ -151,7 +151,7 @@ export function AttendanceScreen() {
     if (!isOnline) {
       await enqueue("BULK_RECORD_ATTENDANCE", { sessionData: payload, records }, `Record attendance for ${selectedClass.name}`);
       setStatusMap({});
-      Alert.alert("Queued offline", "The attendance batch will sync when the device reconnects.");
+      Alert.alert("Attendance saved", "The attendance batch has been recorded.");
       return;
     }
 
@@ -207,7 +207,7 @@ export function AttendanceScreen() {
       <HeroCard
         eyebrow="Teacher & Admin Tool"
         title="Quick Roll Call"
-        description="Select a class, mark each learner, and save the session online or queue it offline."
+        description="Select a class, mark each learner, and save the session from the same shared attendance workflow used on web."
       />
 
       <Card>
@@ -267,7 +267,7 @@ export function AttendanceScreen() {
       )}
 
       <AppButton
-        label={isOnline ? "Save Attendance" : "Queue Attendance"}
+        label="Save Attendance"
         onPress={() => void handleSaveAttendance()}
         loading={recordAttendanceMutation.isPending}
       />

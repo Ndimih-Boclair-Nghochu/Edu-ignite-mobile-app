@@ -6,7 +6,6 @@ import {
   CreditCard,
   LayoutGrid,
   MessageSquare,
-  RefreshCcw,
   UserCircle2,
 } from "lucide-react-native";
 import React from "react";
@@ -15,16 +14,22 @@ import { ActivityIndicator } from "react-native";
 import { DashboardScreen } from "@/screens/app/DashboardScreen";
 import { MessagesScreen } from "@/screens/app/MessagesScreen";
 import { ProfileScreen } from "@/screens/app/ProfileScreen";
-import { SyncScreen } from "@/screens/app/SyncScreen";
 import { WorkspaceScreen } from "@/screens/app/WorkspaceScreen";
 import { ActivateAccountScreen } from "@/screens/auth/ActivateAccountScreen";
 import { LoginScreen } from "@/screens/auth/LoginScreen";
 import { AnnouncementsScreen } from "@/screens/modules/AnnouncementsScreen";
+import { AIScreen } from "@/screens/modules/AIScreen";
+import { AssignmentsScreen } from "@/screens/modules/AssignmentsScreen";
 import { AttendanceScreen } from "@/screens/modules/AttendanceScreen";
+import { CommunityScreen } from "@/screens/modules/CommunityScreen";
+import { ExamsScreen } from "@/screens/modules/ExamsScreen";
 import { FeesScreen } from "@/screens/modules/FeesScreen";
 import { LibraryScreen } from "@/screens/modules/LibraryScreen";
+import { LiveClassesScreen } from "@/screens/modules/LiveClassesScreen";
+import { StaffScreen } from "@/screens/modules/StaffScreen";
 import { StructureScreen } from "@/screens/modules/StructureScreen";
 import { StudentsScreen } from "@/screens/modules/StudentsScreen";
+import { SubjectsScreen } from "@/screens/modules/SubjectsScreen";
 import { ConversationScreen } from "@/screens/shared/ConversationScreen";
 import { navigationTheme, palette } from "@/theme";
 import { RootStackParamList, RootTabParamList } from "@/navigation/types";
@@ -75,14 +80,6 @@ function AppTabs() {
         options={{
           title: "Messages",
           tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="Sync"
-        component={SyncScreen}
-        options={{
-          title: "Sync",
-          tabBarIcon: ({ color, size }) => <RefreshCcw color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -147,6 +144,12 @@ export function Navigation() {
           <>
             <Stack.Screen name="Tabs" component={AppTabs} options={{ headerShown: false }} />
             <Stack.Screen name="Students" component={StudentsScreen} options={{ title: "Students" }} />
+            <Stack.Screen name="Staff" component={StaffScreen} options={{ title: "Staff" }} />
+            <Stack.Screen
+              name="Subjects"
+              component={SubjectsScreen}
+              options={{ title: "Institutional Subjects" }}
+            />
             <Stack.Screen name="Fees" component={FeesScreen} options={{ title: "Fees Portal" }} />
             <Stack.Screen
               name="Announcements"
@@ -166,6 +169,31 @@ export function Navigation() {
               name="Structure"
               component={StructureScreen}
               options={{ title: "Hierarchy & Sections" }}
+            />
+            <Stack.Screen
+              name="Exams"
+              component={ExamsScreen}
+              options={{ title: "Exams & Schedules" }}
+            />
+            <Stack.Screen
+              name="Assignments"
+              component={AssignmentsScreen}
+              options={{ title: "Assignments" }}
+            />
+            <Stack.Screen
+              name="LiveClasses"
+              component={LiveClassesScreen}
+              options={{ title: "Live Classes" }}
+            />
+            <Stack.Screen
+              name="Community"
+              component={CommunityScreen}
+              options={{ title: "Community & Support" }}
+            />
+            <Stack.Screen
+              name="AI"
+              component={AIScreen}
+              options={{ title: "AI Assistant" }}
             />
             <Stack.Screen
               name="Conversation"

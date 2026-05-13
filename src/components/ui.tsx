@@ -14,8 +14,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CircleAlert, CircleCheck, WifiOff } from "lucide-react-native";
-import { useSync } from "@/providers/SyncProvider";
+import { CircleAlert, CircleCheck } from "lucide-react-native";
 import { getInitials } from "@/lib/utils/format";
 import { palette, theme } from "@/theme";
 
@@ -39,8 +38,6 @@ export function Screen({
   contentContainerStyle?: StyleProp<ViewStyle>;
   rightAction?: React.ReactNode;
 }) {
-  const { isOnline, queue } = useSync();
-
   const body = (
     <View style={[styles.screenContent, contentContainerStyle]}>
       <View style={styles.screenHeader}>
@@ -50,14 +47,6 @@ export function Screen({
         </View>
         {rightAction}
       </View>
-      {!isOnline ? (
-        <View style={styles.bannerOffline}>
-          <WifiOff color={palette.warning} size={18} />
-          <Text style={styles.bannerText}>
-            Offline mode. {queue.length} change{queue.length === 1 ? "" : "s"} waiting to sync.
-          </Text>
-        </View>
-      ) : null}
       {children}
     </View>
   );
@@ -410,21 +399,6 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 14,
     lineHeight: 20,
-  },
-  bannerOffline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    backgroundColor: palette.warningSoft,
-  },
-  bannerText: {
-    flex: 1,
-    color: palette.warning,
-    fontSize: 13,
-    fontWeight: "600",
   },
   heroCard: {
     borderRadius: theme.radius.xl,
