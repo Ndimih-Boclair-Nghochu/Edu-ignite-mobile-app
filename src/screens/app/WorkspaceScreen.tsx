@@ -3,38 +3,54 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useMemo } from "react";
 import { Text, View } from "react-native";
 import { AppButton, Card, EmptyState, HeroCard, Screen, SectionTitle } from "@/components/ui";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { getModulesForRole } from "@/features/modules";
 import { RootStackParamList } from "@/navigation/types";
+import { useI18n } from "@/providers/I18nProvider";
 import { useAuth } from "@/providers/AuthProvider";
 
 export function WorkspaceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
-  const modules = getModulesForRole();
+  const { t } = useI18n();
+  const modules = getModulesForRole(user?.role ?? null);
   const groupedModules = useMemo(
     () => ({
+      platform: modules.filter((module) => module.group === "platform"),
+      governance: modules.filter((module) => module.group === "governance"),
       registry: modules.filter((module) => module.group === "registry"),
       academics: modules.filter((module) => module.group === "academics"),
       operations: modules.filter((module) => module.group === "operations"),
-      insights: modules.filter((module) => module.group === "insights"),
+      engagement: modules.filter((module) => module.group === "engagement"),
     }),
     [modules]
   );
 
   return (
     <Screen
-      title="Workspace"
+      title={t("workspace", "Workspace")}
       subtitle="A full mobile map of the same EduIgnite operations available on the shared web backend."
+      rightAction={<LanguageToggle />}
     >
       <HeroCard
         eyebrow="Full Access Workspace"
         title={user?.name ?? "EduIgnite User"}
-        description="Open the same major school work areas, records, and live backend data that drive the web platform."
+        description="Open the same role-specific work areas, records, and backend routes that drive the web platform."
       />
 
       {modules.length ? (
         <View style={{ gap: 20 }}>
           {[
+            {
+              title: "Platform Control",
+              subtitle: "Executive-only oversight across founders, schools, support, and policy.",
+              rows: groupedModules.platform,
+            },
+            {
+              title: "Governance",
+              subtitle: "Settings, strategy, subscription, and recognition records.",
+              rows: groupedModules.governance,
+            },
             {
               title: "Registry & Structure",
               subtitle: "People, hierarchy, classes, and subject allocation.",
@@ -51,9 +67,9 @@ export function WorkspaceScreen() {
               rows: groupedModules.operations,
             },
             {
-              title: "Insights & Engagement",
-              subtitle: "Community, support, and AI-assisted institutional intelligence.",
-              rows: groupedModules.insights,
+              title: "Engagement & Intelligence",
+              subtitle: "Community, feedback, announcements, and AI-assisted insight.",
+              rows: groupedModules.engagement,
             },
           ]
             .filter((group) => group.rows.length)
@@ -88,8 +104,8 @@ export function WorkspaceScreen() {
                           </View>
                         </View>
                         <AppButton
-                          label={`Open ${module.title}`}
-                          onPress={() => navigation.navigate(module.route)}
+                          label={`${t("openModule", "Open")} ${module.title}`}
+                          onPress={() => navigation.navigate(module.route as never)}
                         />
                       </Card>
                     );

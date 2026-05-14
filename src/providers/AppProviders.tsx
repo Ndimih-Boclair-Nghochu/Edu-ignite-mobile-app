@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { queryClient } from "@/lib/api/query-client";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { I18nProvider } from "@/providers/I18nProvider";
 import { SyncProvider } from "@/providers/SyncProvider";
 import { palette } from "@/theme";
 
@@ -39,9 +40,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           }}
         >
           <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <SyncProvider>{children}</SyncProvider>
-            </AuthProvider>
+            <I18nProvider>
+              <AuthProvider>
+                <SyncProvider>{children}</SyncProvider>
+              </AuthProvider>
+            </I18nProvider>
           </QueryClientProvider>
         </PersistQueryClientProvider>
       </SafeAreaProvider>

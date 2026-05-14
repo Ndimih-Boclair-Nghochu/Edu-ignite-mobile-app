@@ -9,13 +9,13 @@ import {
   UserCircle2,
 } from "lucide-react-native";
 import React from "react";
-import { View } from "react-native";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { DashboardScreen } from "@/screens/app/DashboardScreen";
 import { MessagesScreen } from "@/screens/app/MessagesScreen";
 import { ProfileScreen } from "@/screens/app/ProfileScreen";
 import { WorkspaceScreen } from "@/screens/app/WorkspaceScreen";
 import { ActivateAccountScreen } from "@/screens/auth/ActivateAccountScreen";
+import { LandingScreen } from "@/screens/auth/LandingScreen";
 import { LoginScreen } from "@/screens/auth/LoginScreen";
 import { AnnouncementsScreen } from "@/screens/modules/AnnouncementsScreen";
 import { AIScreen } from "@/screens/modules/AIScreen";
@@ -26,6 +26,25 @@ import { ExamsScreen } from "@/screens/modules/ExamsScreen";
 import { FeesScreen } from "@/screens/modules/FeesScreen";
 import { LibraryScreen } from "@/screens/modules/LibraryScreen";
 import { LiveClassesScreen } from "@/screens/modules/LiveClassesScreen";
+import {
+  ChildrenScreen,
+  FeedbackScreen,
+  GradesScreen,
+  IDCardsScreen,
+  InsightsScreen,
+  RewardsScreen,
+  ScheduleScreen,
+  SchoolSettingsScreen,
+  SubscriptionScreen,
+  TranscriptsScreen,
+} from "@/screens/modules/ParityScreens";
+import {
+  FoundersScreen,
+  PlatformSettingsScreen,
+  SchoolsScreen,
+  SupportScreen,
+  TestimonialsScreen,
+} from "@/screens/modules/PlatformScreens";
 import { StaffScreen } from "@/screens/modules/StaffScreen";
 import { StructureScreen } from "@/screens/modules/StructureScreen";
 import { StudentsScreen } from "@/screens/modules/StudentsScreen";
@@ -34,11 +53,14 @@ import { ConversationScreen } from "@/screens/shared/ConversationScreen";
 import { navigationTheme, palette } from "@/theme";
 import { RootStackParamList, RootTabParamList } from "@/navigation/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { useI18n } from "@/providers/I18nProvider";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tabs = createBottomTabNavigator<RootTabParamList>();
 
 function AppTabs() {
+  const { t } = useI18n();
+
   return (
     <Tabs.Navigator
       screenOptions={{
@@ -62,7 +84,7 @@ function AppTabs() {
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          title: "Dashboard",
+          title: t("overview", "Overview"),
           tabBarIcon: ({ color, size }) => <LayoutGrid color={color} size={size} />,
         }}
       />
@@ -70,7 +92,7 @@ function AppTabs() {
         name="Workspace"
         component={WorkspaceScreen}
         options={{
-          title: "Workspace",
+          title: t("workspace", "Workspace"),
           tabBarIcon: ({ color, size }) => <CreditCard color={color} size={size} />,
         }}
       />
@@ -78,7 +100,7 @@ function AppTabs() {
         name="Messages"
         component={MessagesScreen}
         options={{
-          title: "Messages",
+          title: t("messages", "Messages"),
           tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
         }}
       />
@@ -86,7 +108,7 @@ function AppTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          title: "Profile",
+          title: t("profile", "Profile"),
           tabBarIcon: ({ color, size }) => <UserCircle2 color={color} size={size} />,
         }}
       />
@@ -111,6 +133,7 @@ function SplashGate() {
 
 export function Navigation() {
   const { isAuthenticated, isReady } = useAuth();
+  const { t } = useI18n();
 
   if (!isReady) {
     return <SplashGate />;
@@ -133,17 +156,31 @@ export function Navigation() {
       >
         {!isAuthenticated ? (
           <>
+            <Stack.Screen name="Landing" component={LandingScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen
               name="Activate"
               component={ActivateAccountScreen}
-              options={{ title: "Activate Account" }}
+              options={{ title: t("activateAccount", "Activate Account") }}
             />
           </>
         ) : (
           <>
             <Stack.Screen name="Tabs" component={AppTabs} options={{ headerShown: false }} />
+            <Stack.Screen name="Founders" component={FoundersScreen} options={{ title: "Founders" }} />
+            <Stack.Screen name="Schools" component={SchoolsScreen} options={{ title: "Schools" }} />
+            <Stack.Screen name="Support" component={SupportScreen} options={{ title: "Support Registry" }} />
+            <Stack.Screen name="Testimonials" component={TestimonialsScreen} options={{ title: "Testimonials" }} />
+            <Stack.Screen name="PlatformSettings" component={PlatformSettingsScreen} options={{ title: "Portfolio & Policy" }} />
+            <Stack.Screen name="SchoolSettings" component={SchoolSettingsScreen} options={{ title: "Manage Settings" }} />
+            <Stack.Screen name="Insights" component={InsightsScreen} options={{ title: "Strategic Insights" }} />
+            <Stack.Screen name="Rewards" component={RewardsScreen} options={{ title: "Academic Reward" }} />
+            <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ title: "Subscription" }} />
             <Stack.Screen name="Students" component={StudentsScreen} options={{ title: "Students" }} />
+            <Stack.Screen name="Children" component={ChildrenScreen} options={{ title: "My Children" }} />
+            <Stack.Screen name="IDCards" component={IDCardsScreen} options={{ title: "ID Cards" }} />
+            <Stack.Screen name="Transcripts" component={TranscriptsScreen} options={{ title: "Transcripts" }} />
+            <Stack.Screen name="Grades" component={GradesScreen} options={{ title: "Report Card" }} />
             <Stack.Screen name="Staff" component={StaffScreen} options={{ title: "Staff" }} />
             <Stack.Screen
               name="Subjects"
@@ -159,6 +196,7 @@ export function Navigation() {
                 headerRight: () => <Bell color={palette.primary} size={18} />,
               }}
             />
+            <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ title: "Feedback" }} />
             <Stack.Screen
               name="Attendance"
               component={AttendanceScreen}
@@ -194,6 +232,11 @@ export function Navigation() {
               name="AI"
               component={AIScreen}
               options={{ title: "AI Assistant" }}
+            />
+            <Stack.Screen
+              name="Schedule"
+              component={ScheduleScreen}
+              options={{ title: "Schedule" }}
             />
             <Stack.Screen
               name="Conversation"

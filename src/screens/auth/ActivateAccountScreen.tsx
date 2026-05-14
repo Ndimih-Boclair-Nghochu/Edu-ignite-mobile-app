@@ -1,21 +1,30 @@
+import { useQuery } from "@tanstack/react-query";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Image } from "react-native";
 import { AppButton, Card, Field, Screen, SuccessInline } from "@/components/ui";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { authService } from "@/lib/api/services/auth.service";
+import { platformService } from "@/lib/api/services/platform.service";
 import { RootStackParamList } from "@/navigation/types";
+import { useI18n } from "@/providers/I18nProvider";
 import { useAuth } from "@/providers/AuthProvider";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Activate">;
 
 export function ActivateAccountScreen({ navigation }: Props) {
   const { signIn } = useAuth();
+  const { t } = useI18n();
   const [matricule, setMatricule] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const platformSettingsQuery = useQuery({
+    queryKey: ["platform", "settings", "activate"],
+    queryFn: () => platformService.getPlatformSettings(),
+  });
 
   async function handleActivate() {
     if (!matricule.trim() || !password.trim() || !confirmPassword.trim()) {
@@ -48,10 +57,14 @@ export function ActivateAccountScreen({ navigation }: Props) {
 
   return (
     <Screen
-      title="Activate Account"
+      title={t("activateAccount", "Activate Account")}
       subtitle="Set the first password for a newly issued EduIgnite account."
+      rightAction={<LanguageToggle />}
     >
       <Card>
+        {platformSettingsQuery.data?.logo ? (
+          <Image source={{ uri: platformSettingsQuery.data.logo }} style={{ width: 64, height: 64, borderRadius: 18, backgroundColor: "#FFFFFF" }} resizeMode="contain" />
+        ) : null}
         <Field
           label="Matricule"
           value={matricule}
@@ -73,8 +86,8 @@ export function ActivateAccountScreen({ navigation }: Props) {
           onChangeText={setConfirmPassword}
           placeholder="Repeat the new password"
         />
-        <AppButton label="Activate Account" onPress={handleActivate} loading={loading} />
-        <AppButton label="Back to Login" variant="ghost" onPress={() => navigation.goBack()} />
+        <AppButton label={t("activateAccount", "Activate Account")} onPress={handleActivate} loading={loading} />
+        <AppButton label={t("login", "Login")} variant="ghost" onPress={() => navigation.navigate("Login")} />
         {message ? <SuccessInline label={message} /> : null}
       </Card>
     </Screen>
