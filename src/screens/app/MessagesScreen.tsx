@@ -26,11 +26,13 @@ import { Conversation, RelatedChatUser } from "@/lib/api/types";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime, formatRole } from "@/lib/utils/format";
 import { RootStackParamList } from "@/navigation/types";
+import { useAuth } from "@/providers/AuthProvider";
 import { useSync } from "@/providers/SyncProvider";
 import { palette, theme } from "@/theme";
 
 export function MessagesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
   const { isOnline } = useSync();
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
@@ -85,6 +87,26 @@ export function MessagesScreen() {
         conversation.conversation_type === "direct" &&
         conversation.participants.some((participant) => participant.id === person.id)
     );
+  }
+
+  function getConversationDisplay(conversation: Conversation) {
+    if (conversation.conversation_type === "direct") {
+      const counterpart =
+        conversation.participants.find((participant) => participant.id !== user?.id) ??
+        conversation.participants[0];
+      return {
+        title: counterpart?.name || conversation.name || "Conversation",
+        avatar: counterpart?.avatar,
+      };
+    }
+
+    return {
+      title:
+        conversation.name ||
+        conversation.participants.map((participant) => participant.name).join(", ") ||
+        "Group Chat",
+      avatar: null,
+    };
   }
 
   function handleDirectOpen(person: RelatedChatUser) {
@@ -150,10 +172,8 @@ export function MessagesScreen() {
       ) : filteredConversations.length ? (
         <View style={{ gap: 10 }}>
           {filteredConversations.map((conversation) => {
-            const conversationTitle =
-              conversation.name ||
-              conversation.participants.map((participant) => participant.name).join(", ");
-            const initialsName = conversation.name || conversationTitle;
+            const conversationDisplay = getConversationDisplay(conversation);
+            const conversationTitle = conversationDisplay.title;
 
             return (
               <Pressable
@@ -162,7 +182,11 @@ export function MessagesScreen() {
                 style={({ pressed }) => [pressed ? styles.pressed : null]}
               >
                 <Card style={styles.chatRow}>
-                  <UserAvatar name={initialsName} size={58} />
+                  <UserAvatar
+                    name={conversationTitle}
+                    uri={conversationDisplay.avatar}
+                    size={58}
+                  />
                   <View style={styles.chatMeta}>
                     <View style={styles.chatTopRow}>
                       <Text numberOfLines={1} style={styles.chatTitle}>

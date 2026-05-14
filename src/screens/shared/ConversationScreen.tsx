@@ -23,9 +23,10 @@ import {
 import { UserAvatar } from "@/components/ui";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { chatService } from "@/lib/api/services/chat.service";
+import { ConversationParticipant } from "@/lib/api/types";
 import { Message } from "@/lib/api/types";
 import { queryKeys } from "@/lib/queryKeys";
-import { formatDateTime, formatRole } from "@/lib/utils/format";
+import { formatDateTime } from "@/lib/utils/format";
 import { RootStackParamList } from "@/navigation/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { useSync } from "@/providers/SyncProvider";
@@ -121,6 +122,38 @@ export function ConversationScreen() {
     return participants.find((participant) => participant.id !== user?.id) ?? participants[0];
   }, [conversationQuery.data?.participants, user?.id]);
 
+  const participantMap = useMemo(() => {
+    return new Map(
+      (conversationQuery.data?.participants ?? []).map((participant) => [
+        participant.id,
+        participant,
+      ])
+    );
+  }, [conversationQuery.data?.participants]);
+
+  const headerSubtitle = useMemo(() => {
+    if (conversationQuery.data?.conversation_type === "group") {
+      const groupParts = [
+        conversationQuery.data.subject_name,
+        conversationQuery.data.school_class_name,
+      ].filter(Boolean);
+      return groupParts.join(" • ") || "Group chat";
+    }
+
+    return "Direct message";
+  }, [conversationQuery.data?.conversation_type, conversationQuery.data?.school_class_name, conversationQuery.data?.subject_name]);
+
+  function getMessageSender(message: Message): ConversationParticipant | Message["sender"] {
+    return (
+      message.sender ??
+      participantMap.get(message.sender_id ?? "") ?? {
+        id: message.sender_id ?? "",
+        name: message.sender_name || "User",
+        avatar: message.sender_avatar || null,
+      }
+    );
+  }
+
   async function handleSend() {
     if (!text.trim()) {
       return;
@@ -159,9 +192,7 @@ export function ConversationScreen() {
             <Text style={styles.headerTitle}>
               {counterpart?.name || route.params.title || "Conversation"}
             </Text>
-            <Text style={styles.headerSubtitle}>
-              {counterpart?.role ? formatRole(counterpart.role) : "Messages"}
-            </Text>
+            <Text style={styles.headerSubtitle}>{headerSubtitle}</Text>
           </View>
         </View>
 
@@ -179,7 +210,8 @@ export function ConversationScreen() {
           ) : null}
 
           {mergedMessages.map((message) => {
-            const mine = message.sender?.id === user?.id;
+            const sender = getMessageSender(message);
+            const mine = sender?.id === user?.id;
             const pending = "pending" in message && Boolean(message.pending);
 
             return (
@@ -187,6 +219,13 @@ export function ConversationScreen() {
                 key={message.id}
                 style={[styles.messageRow, mine ? styles.messageRowMine : styles.messageRowOther]}
               >
+                {!mine ? (
+                  <UserAvatar
+                    name={sender?.name || "User"}
+                    uri={sender?.avatar}
+                    size={34}
+                  />
+                ) : null}
                 <View
                   style={[
                     styles.messageBubble,
@@ -194,7 +233,7 @@ export function ConversationScreen() {
                   ]}
                 >
                   {!mine ? (
-                    <Text style={styles.senderName}>{message.sender?.name || "User"}</Text>
+                    <Text style={styles.senderName}>{sender?.name || "User"}</Text>
                   ) : null}
                   <Text
                     style={[styles.messageText, mine ? styles.messageTextMine : styles.messageTextOther]}
@@ -299,6 +338,8 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
   },
   messageRowMine: {
     justifyContent: "flex-end",

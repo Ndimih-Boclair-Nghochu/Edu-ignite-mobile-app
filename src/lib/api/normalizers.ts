@@ -1,4 +1,13 @@
-import type { FounderProfile, PlatformSettings, School, User } from "./types";
+import type {
+  Conversation,
+  ConversationParticipant,
+  FounderProfile,
+  Message,
+  MessageSender,
+  PlatformSettings,
+  School,
+  User,
+} from "./types";
 import { resolveMediaUrl } from "@/lib/media";
 
 export function normalizeSchool(school: Record<string, any> | undefined | null): School | undefined {
@@ -112,5 +121,89 @@ export function normalizePlatformSettings(
     fees: settings?.fees ?? {},
     tutorial_links: settings?.tutorial_links ?? settings?.tutorialLinks ?? {},
     tutorialLinks: settings?.tutorialLinks ?? settings?.tutorial_links ?? {},
+  };
+}
+
+export function normalizeConversationParticipant(
+  participant: Record<string, any> | undefined | null
+): ConversationParticipant {
+  return {
+    id: participant?.id ?? participant?.user_id ?? "",
+    name: participant?.name ?? participant?.user_name ?? "",
+    avatar: resolveMediaUrl(participant?.avatar ?? participant?.user_avatar),
+    email: participant?.email ?? participant?.user_email ?? "",
+    role: participant?.role ?? "",
+  };
+}
+
+export function normalizeMessageSender(
+  sender: Record<string, any> | undefined | null
+): MessageSender {
+  return {
+    id: sender?.id ?? sender?.sender_id ?? "",
+    name: sender?.name ?? sender?.sender_name ?? "",
+    avatar: resolveMediaUrl(sender?.avatar ?? sender?.sender_avatar),
+  };
+}
+
+export function normalizeMessage(message: Record<string, any> | undefined | null): Message {
+  const sender = normalizeMessageSender({
+    id: message?.sender?.id ?? message?.sender_id,
+    name: message?.sender?.name ?? message?.sender_name,
+    avatar: message?.sender?.avatar ?? message?.sender_avatar,
+  });
+
+  return {
+    ...(message as Message),
+    id: message?.id ?? "",
+    conversation: message?.conversation ?? message?.conversation_id ?? "",
+    sender,
+    sender_id: sender.id,
+    sender_name: sender.name,
+    sender_avatar: sender.avatar,
+    text: message?.text ?? "",
+    message_type: message?.message_type ?? "text",
+    attachment: message?.attachment ?? null,
+    is_official: message?.is_official ?? false,
+    is_read: message?.is_read ?? false,
+    read_at: message?.read_at ?? null,
+    reply_to: message?.reply_to ?? undefined,
+    reply_to_text: message?.reply_to_text ?? null,
+    created_at: message?.created_at ?? new Date().toISOString(),
+    is_deleted: message?.is_deleted ?? false,
+  };
+}
+
+export function normalizeConversation(
+  conversation: Record<string, any> | undefined | null
+): Conversation {
+  return {
+    ...(conversation as Conversation),
+    id: conversation?.id ?? "",
+    participants: Array.isArray(conversation?.participants)
+      ? conversation.participants.map((participant: Record<string, any>) =>
+          normalizeConversationParticipant(participant)
+        )
+      : [],
+    conversation_type: conversation?.conversation_type ?? "direct",
+    name: conversation?.name ?? "",
+    last_message: conversation?.last_message ?? "",
+    last_message_at: conversation?.last_message_at ?? "",
+    school_class: conversation?.school_class ?? null,
+    school_class_name: conversation?.school_class_name ?? "",
+    subject: conversation?.subject ?? null,
+    subject_name: conversation?.subject_name ?? "",
+    only_admins_can_send: conversation?.only_admins_can_send ?? false,
+    admin_participant_ids: conversation?.admin_participant_ids ?? [],
+    is_current_user_admin: conversation?.is_current_user_admin ?? false,
+    unread_count: conversation?.unread_count ?? 0,
+    participant_count:
+      conversation?.participant_count ??
+      (Array.isArray(conversation?.participants) ? conversation.participants.length : 0),
+    recent_messages: Array.isArray(conversation?.recent_messages)
+      ? conversation.recent_messages.map((message: Record<string, any>) =>
+          normalizeMessage(message)
+        )
+      : [],
   };
 }

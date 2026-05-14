@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { HeroCard, Field, PasswordField, Screen, AppButton, Card, SuccessInline } from "@/components/ui";
+import { Field, PasswordField, Screen, AppButton, Card, SuccessInline } from "@/components/ui";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { platformService } from "@/lib/api/services/platform.service";
@@ -59,7 +59,7 @@ export function LoginScreen({ navigation }: Props) {
     >
       <Screen
         title={platformSettingsQuery.data?.name || "EduIgnite Mobile"}
-        subtitle="The same institution backend, redesigned for fast and reliable mobile work."
+        subtitle="Sign in"
         contentContainerStyle={styles.screenContent}
         rightAction={<LanguageToggle />}
       >
@@ -101,15 +101,14 @@ export function LoginScreen({ navigation }: Props) {
               variant="ghost"
               onPress={() => navigation.navigate("Activate")}
             />
+            <AppButton
+              label="Forgot Password"
+              variant="ghost"
+              onPress={() => navigation.navigate("ForgotPassword")}
+            />
             <AppButton label="Back to Landing" variant="ghost" onPress={() => navigation.navigate("Landing")} />
             {message ? <SuccessInline label={message} /> : null}
           </Card>
-
-          <HeroCard
-            eyebrow="Mobile Workspace"
-            title="Sign in once, keep working anywhere"
-            description="Teachers, school admins, bursars, parents, and learners all enter the same live platform from one professional mobile workspace."
-          />
         </View>
       </Screen>
     </KeyboardAvoidingView>

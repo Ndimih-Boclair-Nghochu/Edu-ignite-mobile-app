@@ -1,6 +1,12 @@
 import { apiClient } from '../client';
 import { API } from '../endpoints';
 import {
+  normalizeConversation,
+  normalizeMessage,
+  normalizeUser,
+} from '../normalizers';
+import { normalizePaginatedResponse } from '../normalize';
+import {
   Conversation,
   Message,
   PaginatedResponse,
@@ -14,23 +20,30 @@ import {
 export const chatService = {
   async getConversations(params?: ListParams): Promise<PaginatedResponse<Conversation>> {
     const { data } = await apiClient.get(API.CHAT.CONVERSATIONS, { params });
-    return data;
+    const normalized = normalizePaginatedResponse<Conversation>(data);
+    return {
+      ...normalized,
+      results: normalized.results.map((conversation) =>
+        normalizeConversation(conversation as Record<string, any>)
+      ),
+    };
   },
 
   async getConversation(id: string): Promise<Conversation> {
     const { data } = await apiClient.get(API.CHAT.CONVERSATION_DETAIL(id));
-    return data;
+    return normalizeConversation(data);
   },
 
   async getOrCreateDirect(userIdOrPayload: string | { userId: string }): Promise<Conversation> {
     const userId = typeof userIdOrPayload === 'string' ? userIdOrPayload : userIdOrPayload.userId;
     const { data } = await apiClient.post(API.CHAT.DIRECT, { user_id: userId });
-    return data;
+    return normalizeConversation(data);
   },
 
   async getRelatedUsers(): Promise<RelatedChatUser[]> {
     const { data } = await apiClient.get(API.CHAT.RELATED_USERS);
-    return Array.isArray(data) ? data : data?.results ?? [];
+    const rows = Array.isArray(data) ? data : data?.results ?? [];
+    return rows.map((user: Record<string, any>) => normalizeUser(user) as RelatedChatUser);
   },
 
   async getTeacherGroupOptions(): Promise<TeacherGroupClassOption[]> {
@@ -40,7 +53,7 @@ export const chatService = {
 
   async createTeacherGroup(payload: CreateTeacherGroupRequest): Promise<Conversation> {
     const { data } = await apiClient.post(API.CHAT.CREATE_TEACHER_GROUP, payload);
-    return data;
+    return normalizeConversation(data);
   },
 
   async getMessages(
@@ -48,7 +61,13 @@ export const chatService = {
     params?: ListParams
   ): Promise<PaginatedResponse<Message>> {
     const { data } = await apiClient.get(API.CHAT.MESSAGES(conversationId), { params });
-    return data;
+    const normalized = normalizePaginatedResponse<Message>(data);
+    return {
+      ...normalized,
+      results: normalized.results.map((message) =>
+        normalizeMessage(message as Record<string, any>)
+      ),
+    };
   },
 
   async sendMessage(
@@ -65,7 +84,7 @@ export const chatService = {
       ...messageData,
       conversation_id: conversationId,
     });
-    return data;
+    return normalizeMessage(data);
   },
 
   async markConversationRead(
@@ -76,12 +95,12 @@ export const chatService = {
         ? conversationIdOrPayload
         : conversationIdOrPayload.id;
     const { data } = await apiClient.post(API.CHAT.MARK_READ(conversationId), {});
-    return data;
+    return normalizeConversation(data);
   },
 
   async updateConversationSettings(conversationId: string, payload: Partial<Conversation>): Promise<Conversation> {
     const { data } = await apiClient.patch(API.CHAT.SETTINGS(conversationId), payload);
-    return data;
+    return normalizeConversation(data);
   },
 
   async addParticipant(conversationId: string, userId: string): Promise<any> {

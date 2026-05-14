@@ -15,6 +15,7 @@ import { MessagesScreen } from "@/screens/app/MessagesScreen";
 import { ProfileScreen } from "@/screens/app/ProfileScreen";
 import { WorkspaceScreen } from "@/screens/app/WorkspaceScreen";
 import { ActivateAccountScreen } from "@/screens/auth/ActivateAccountScreen";
+import { ForgotPasswordScreen } from "@/screens/auth/ForgotPasswordScreen";
 import { LandingScreen } from "@/screens/auth/LandingScreen";
 import { LoginScreen } from "@/screens/auth/LoginScreen";
 import { AnnouncementsScreen } from "@/screens/modules/AnnouncementsScreen";
@@ -162,6 +163,11 @@ export function Navigation() {
               name="Activate"
               component={ActivateAccountScreen}
               options={{ title: t("activateAccount", "Activate Account") }}
+            />
+            <Stack.Screen
+              name="ForgotPassword"
+              component={ForgotPasswordScreen}
+              options={{ headerShown: false }}
             />
           </>
         ) : (

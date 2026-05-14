@@ -1220,7 +1220,7 @@ export interface RejectSupportRequest {
 
 export interface Conversation {
   id: string;
-  participants: User[];
+  participants: ConversationParticipant[];
   conversation_type: "direct" | "group" | "official" | "support" | string;
   name?: string;
   last_message?: string;
@@ -1237,15 +1237,35 @@ export interface Conversation {
   recent_messages?: Message[];
 }
 
+export interface ConversationParticipant {
+  id: string;
+  name: string;
+  avatar?: string | null;
+  email?: string;
+  role?: string;
+}
+
+export interface MessageSender {
+  id: string;
+  name: string;
+  avatar?: string | null;
+}
+
 export interface Message {
   id: string;
   conversation: string;
-  sender: User;
+  sender: MessageSender;
+  sender_id?: string;
+  sender_name?: string;
+  sender_avatar?: string | null;
   text: string;
   message_type: string;
   is_official: boolean;
   is_read: boolean;
   reply_to?: string;
+  reply_to_text?: string | null;
+  attachment?: string | null;
+  read_at?: string | null;
   created_at: string;
   is_deleted: boolean;
 }

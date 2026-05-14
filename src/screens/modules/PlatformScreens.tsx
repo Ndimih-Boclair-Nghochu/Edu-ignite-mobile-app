@@ -26,6 +26,7 @@ import { usersService } from "@/lib/api/services/users.service";
 import {
   FounderAccessLevel,
   FounderProfile,
+  PublicEvent,
   School,
   UpdatePlatformSettingsRequest,
   UserRole,
@@ -74,6 +75,21 @@ const REGION_OPTIONS = [
   "Southwest",
 ];
 
+const TUTORIAL_ROLE_OPTIONS: UserRole[] = [
+  "STUDENT",
+  "TEACHER",
+  "PARENT",
+  "SCHOOL_ADMIN",
+  "SUB_ADMIN",
+  "BURSAR",
+  "LIBRARIAN",
+];
+
+const PORTFOLIO_TYPE_OPTIONS = [
+  { label: "Video", value: "video" },
+  { label: "Image", value: "image" },
+] as const;
+
 type FounderFormState = {
   name: string;
   email: string;
@@ -110,6 +126,13 @@ type SchoolFormState = {
   email: string;
 };
 
+type PortfolioFormState = {
+  title: string;
+  description: string;
+  url: string;
+  type: "video" | "image";
+};
+
 const EMPTY_FOUNDER_FORM: FounderFormState = {
   name: "",
   email: "",
@@ -144,6 +167,13 @@ const EMPTY_SCHOOL_FORM: SchoolFormState = {
   address: "",
   phone: "",
   email: "",
+};
+
+const EMPTY_PORTFOLIO_FORM: PortfolioFormState = {
+  title: "",
+  description: "",
+  url: "",
+  type: "video",
 };
 
 function hydrateFounderForm(founder: FounderProfile): FounderFormState {
@@ -1249,12 +1279,21 @@ export function PlatformSettingsScreen() {
     queryFn: () => platformService.getPlatformStats(),
   });
 
+  const eventsQuery = useQuery({
+    queryKey: ["platform", "settings", "events"],
+    queryFn: () => platformService.getPublicEvents({ page_size: 30 }),
+  });
+
   const [name, setName] = useState("");
   const [deadline, setDeadline] = useState("");
   const [honourRollThreshold, setHonourRollThreshold] = useState("15");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [fees, setFees] = useState<Record<string, string>>({});
+  const [tutorialLinks, setTutorialLinks] = useState<Record<string, string>>({});
+  const [portfolioEditorOpen, setPortfolioEditorOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<PublicEvent | null>(null);
+  const [portfolioForm, setPortfolioForm] = useState<PortfolioFormState>(EMPTY_PORTFOLIO_FORM);
 
   React.useEffect(() => {
     if (!settingsQuery.data) {
@@ -1272,6 +1311,9 @@ export function PlatformSettingsScreen() {
     setContactEmail(settingsQuery.data.contact_email || "");
     setContactPhone(settingsQuery.data.contact_phone || "");
     setFees(settingsQuery.data.fees ?? {});
+    setTutorialLinks(
+      settingsQuery.data.tutorial_links ?? settingsQuery.data.tutorialLinks ?? {}
+    );
   }, [settingsQuery.data]);
 
   const saveMutation = useMutation({
@@ -1287,6 +1329,19 @@ export function PlatformSettingsScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["platform", "settings"] });
       Alert.alert("Platform settings updated", "The platform settings have been saved.");
+    },
+    onError: (error) => Alert.alert("Save failed", getApiErrorMessage(error)),
+  });
+
+  const saveTutorialsMutation = useMutation({
+    mutationFn: () =>
+      platformService.updatePlatformSettings({
+        tutorial_links: tutorialLinks,
+        tutorialLinks,
+      } as UpdatePlatformSettingsRequest),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["platform", "settings"] });
+      Alert.alert("Training links updated", "The role training links have been saved.");
     },
     onError: (error) => Alert.alert("Save failed", getApiErrorMessage(error)),
   });
@@ -1308,6 +1363,84 @@ export function PlatformSettingsScreen() {
     },
     onError: (error) => Alert.alert("Upload failed", getApiErrorMessage(error)),
   });
+
+  const uploadEventImageMutation = useMutation({
+    mutationFn: async () => {
+      const file = await pickImageUpload({ allowsEditing: true, quality: 0.86 });
+      if (!file) {
+        return null;
+      }
+      return platformService.uploadEventMedia(file);
+    },
+    onSuccess: (payload) => {
+      if (!payload) {
+        return;
+      }
+      setPortfolioForm((current) => ({
+        ...current,
+        type: payload.media_type,
+        url: payload.media_url,
+      }));
+      Alert.alert("Media ready", "The portfolio image has been uploaded.");
+    },
+    onError: (error) => Alert.alert("Upload failed", getApiErrorMessage(error)),
+  });
+
+  const saveEventMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        title: portfolioForm.title.trim(),
+        description: portfolioForm.description.trim(),
+        url: portfolioForm.url.trim(),
+        type: portfolioForm.type,
+        is_active: true,
+      };
+
+      if (!payload.title || !payload.url) {
+        throw new Error("Enter the portfolio title and media link.");
+      }
+
+      if (editingEvent?.id) {
+        return platformService.updatePublicEvent(editingEvent.id, payload);
+      }
+
+      return platformService.createPublicEvent(payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["platform", "settings", "events"] });
+      setPortfolioEditorOpen(false);
+      setEditingEvent(null);
+      setPortfolioForm(EMPTY_PORTFOLIO_FORM);
+      Alert.alert("Portfolio updated", "The public portfolio item has been saved.");
+    },
+    onError: (error) => Alert.alert("Save failed", getApiErrorMessage(error)),
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: (eventId: string) => platformService.deletePublicEvent(eventId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["platform", "settings", "events"] });
+      Alert.alert("Portfolio updated", "The portfolio item has been removed.");
+    },
+    onError: (error) => Alert.alert("Delete failed", getApiErrorMessage(error)),
+  });
+
+  function openCreatePortfolioItem() {
+    setEditingEvent(null);
+    setPortfolioForm(EMPTY_PORTFOLIO_FORM);
+    setPortfolioEditorOpen(true);
+  }
+
+  function openEditPortfolioItem(event: PublicEvent) {
+    setEditingEvent(event);
+    setPortfolioForm({
+      title: event.title || "",
+      description: event.description || "",
+      url: event.url || "",
+      type: event.type === "image" ? "image" : "video",
+    });
+    setPortfolioEditorOpen(true);
+  }
 
   return (
     <Screen title="Portfolio & Policy" subtitle="Platform settings">
@@ -1400,8 +1533,151 @@ export function PlatformSettingsScreen() {
               loading={saveMutation.isPending}
             />
           </Card>
+
+          <Card>
+            <SectionTitle title="Training Links" />
+            <View style={{ gap: 14 }}>
+              {TUTORIAL_ROLE_OPTIONS.map((role) => (
+                <Field
+                  key={role}
+                  label={formatRole(role)}
+                  value={tutorialLinks[role] || ""}
+                  onChangeText={(value) =>
+                    setTutorialLinks((current) => ({ ...current, [role]: value }))
+                  }
+                  placeholder="https://..."
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              ))}
+            </View>
+            <AppButton
+              label="Save Training Links"
+              variant="secondary"
+              onPress={() => saveTutorialsMutation.mutate()}
+              loading={saveTutorialsMutation.isPending}
+            />
+          </Card>
+
+          <SectionTitle
+            title="Public Portfolio"
+            rightAction={<AppButton compact label="Add Item" onPress={openCreatePortfolioItem} />}
+          />
+          {eventsQuery.isLoading && !eventsQuery.data ? (
+            <LoadingState label="Loading portfolio..." />
+          ) : (eventsQuery.data?.results ?? []).length ? (
+            <View style={{ gap: 12 }}>
+              {(eventsQuery.data?.results ?? []).map((event) => (
+                <Card key={event.id}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    {event.type === "image" && event.url ? (
+                      <Image
+                        source={{ uri: event.url }}
+                        resizeMode="cover"
+                        style={{ width: 72, height: 72, borderRadius: 18 }}
+                      />
+                    ) : (
+                      <UserAvatar name={event.title} size={72} />
+                    )}
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ fontWeight: "800", fontSize: 16, color: palette.text }}>
+                        {event.title}
+                      </Text>
+                      <Text style={{ color: palette.textMuted }}>
+                        {event.description || "Public portfolio item"}
+                      </Text>
+                      <Tag label={event.type} />
+                    </View>
+                  </View>
+                  <AppButton
+                    label="Edit Item"
+                    variant="secondary"
+                    onPress={() => openEditPortfolioItem(event)}
+                  />
+                  <AppButton
+                    label="Remove Item"
+                    variant="danger"
+                    onPress={() => deleteEventMutation.mutate(event.id)}
+                    loading={deleteEventMutation.isPending}
+                  />
+                </Card>
+              ))}
+            </View>
+          ) : (
+            <EmptyState
+              title="No portfolio items yet"
+              description="Public portfolio items will appear here."
+            />
+          )}
         </>
       )}
+
+      <ModalSheet
+        visible={portfolioEditorOpen}
+        title={editingEvent ? "Edit Portfolio Item" : "Add Portfolio Item"}
+        onClose={() => {
+          setPortfolioEditorOpen(false);
+          setEditingEvent(null);
+          setPortfolioForm(EMPTY_PORTFOLIO_FORM);
+        }}
+      >
+        <View style={{ gap: 16 }}>
+          <OptionChips
+            label="Type"
+            options={PORTFOLIO_TYPE_OPTIONS.map((option) => ({
+              label: option.label,
+              value: option.value,
+            }))}
+            value={portfolioForm.type}
+            onChange={(value) =>
+              setPortfolioForm((current) => ({
+                ...current,
+                type: value as "video" | "image",
+              }))
+            }
+          />
+          <Field
+            label="Title"
+            value={portfolioForm.title}
+            onChangeText={(value) =>
+              setPortfolioForm((current) => ({ ...current, title: value }))
+            }
+            placeholder="Portfolio headline"
+          />
+          <Field
+            label="Description"
+            value={portfolioForm.description}
+            onChangeText={(value) =>
+              setPortfolioForm((current) => ({ ...current, description: value }))
+            }
+            placeholder="Short summary"
+            multiline
+          />
+          <Field
+            label={portfolioForm.type === "video" ? "Video URL" : "Image URL"}
+            value={portfolioForm.url}
+            onChangeText={(value) =>
+              setPortfolioForm((current) => ({ ...current, url: value }))
+            }
+            placeholder="https://..."
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {portfolioForm.type === "image" ? (
+            <AppButton
+              label="Upload Image"
+              variant="ghost"
+              onPress={() => uploadEventImageMutation.mutate()}
+              loading={uploadEventImageMutation.isPending}
+            />
+          ) : null}
+          <AppButton
+            label={editingEvent ? "Save Item" : "Create Item"}
+            onPress={() => saveEventMutation.mutate()}
+            loading={saveEventMutation.isPending}
+          />
+        </View>
+      </ModalSheet>
     </Screen>
   );
 }
