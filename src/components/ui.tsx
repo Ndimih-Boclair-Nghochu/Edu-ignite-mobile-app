@@ -15,7 +15,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CircleAlert, CircleCheck } from "lucide-react-native";
+import { CircleAlert, CircleCheck, Eye, EyeOff } from "lucide-react-native";
 import { getInitials } from "@/lib/utils/format";
 import { palette, theme } from "@/theme";
 
@@ -227,6 +227,47 @@ export function Field({
         style={[styles.input, multiline ? styles.inputMultiline : null]}
         {...props}
       />
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+export function PasswordField({
+  label,
+  hint,
+  style,
+  ...props
+}: TextInputProps & {
+  label: string;
+  hint?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const [revealed, setRevealed] = React.useState(false);
+
+  return (
+    <View style={[styles.fieldWrap, style]}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.fieldInlineWrap}>
+        <TextInput
+          placeholderTextColor={palette.textMuted}
+          style={[styles.input, styles.inputWithAction]}
+          secureTextEntry={!revealed}
+          autoCapitalize="none"
+          autoCorrect={false}
+          {...props}
+        />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setRevealed((current) => !current)}
+          style={styles.fieldAction}
+        >
+          {revealed ? (
+            <EyeOff color={palette.textMuted} size={18} />
+          ) : (
+            <Eye color={palette.textMuted} size={18} />
+          )}
+        </Pressable>
+      </View>
       {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
     </View>
   );
@@ -586,6 +627,9 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 15,
   },
+  inputWithAction: {
+    paddingRight: 52,
+  },
   inputMultiline: {
     minHeight: 112,
     paddingTop: theme.spacing.md,
@@ -595,6 +639,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     color: palette.textMuted,
+  },
+  fieldInlineWrap: {
+    position: "relative",
+    justifyContent: "center",
+  },
+  fieldAction: {
+    position: "absolute",
+    right: theme.spacing.md,
+    height: 36,
+    width: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
   optionRow: {
     flexDirection: "row",

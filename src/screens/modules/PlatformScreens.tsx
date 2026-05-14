@@ -9,6 +9,7 @@ import {
   LoadingState,
   ModalSheet,
   OptionChips,
+  PasswordField,
   Screen,
   SectionTitle,
   StatCard,
@@ -25,6 +26,7 @@ import { usersService } from "@/lib/api/services/users.service";
 import {
   FounderAccessLevel,
   FounderProfile,
+  School,
   UpdatePlatformSettingsRequest,
   UserRole,
 } from "@/lib/api/types";
@@ -61,6 +63,17 @@ const FEE_ROLE_ORDER: UserRole[] = [
   "LIBRARIAN",
 ];
 
+const REGION_OPTIONS = [
+  "Littoral",
+  "Centre",
+  "East",
+  "North",
+  "South",
+  "West",
+  "Northwest",
+  "Southwest",
+];
+
 type FounderFormState = {
   name: string;
   email: string;
@@ -78,6 +91,23 @@ type ShareFormState = {
   percentage: string;
   note: string;
   durationDays: string;
+};
+
+type SchoolFormState = {
+  id: string;
+  name: string;
+  shortName: string;
+  principal: string;
+  motto: string;
+  description: string;
+  location: string;
+  region: string;
+  division: string;
+  subDivision: string;
+  cityVillage: string;
+  address: string;
+  phone: string;
+  email: string;
 };
 
 const EMPTY_FOUNDER_FORM: FounderFormState = {
@@ -99,6 +129,23 @@ const EMPTY_SHARE_FORM: ShareFormState = {
   durationDays: "365",
 };
 
+const EMPTY_SCHOOL_FORM: SchoolFormState = {
+  id: "",
+  name: "",
+  shortName: "",
+  principal: "",
+  motto: "Discipline - Work - Success",
+  description: "Institutional node",
+  location: "",
+  region: "Littoral",
+  division: "",
+  subDivision: "",
+  cityVillage: "",
+  address: "",
+  phone: "",
+  email: "",
+};
+
 function hydrateFounderForm(founder: FounderProfile): FounderFormState {
   return {
     name: founder.name,
@@ -111,6 +158,25 @@ function hydrateFounderForm(founder: FounderProfile): FounderFormState {
     accessLevel: founder.access_level,
     hasRenewableShares: founder.has_renewable_shares,
     shareRenewalPeriodDays: String(founder.share_renewal_period_days || 365),
+  };
+}
+
+function hydrateSchoolForm(school: School): SchoolFormState {
+  return {
+    id: school.id || school.short_name || school.shortName || "",
+    name: school.name || "",
+    shortName: school.short_name || school.shortName || "",
+    principal: school.principal || "",
+    motto: school.motto || "Discipline - Work - Success",
+    description: school.description || "Institutional node",
+    location: school.location || "",
+    region: school.region || "Littoral",
+    division: school.division || "",
+    subDivision: school.sub_division || school.subDivision || "",
+    cityVillage: school.city_village || school.cityVillage || "",
+    address: school.address || "",
+    phone: school.phone || "",
+    email: school.email || "",
   };
 }
 
@@ -579,12 +645,11 @@ export function FoundersScreen() {
             onChangeText={setDeleteMatricule}
             placeholder="Matricule"
           />
-          <Field
+          <PasswordField
             label="Your Password"
             value={deletePassword}
             onChangeText={setDeletePassword}
             placeholder="Password"
-            secureTextEntry
           />
           <AppButton
             label="Remove Founder"
@@ -709,6 +774,9 @@ function FounderForm({
 }
 
 export function SchoolsScreen() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canManageSchools = ["CEO", "CTO", "SUPER_ADMIN"].includes(user?.role || "");
   const statsQuery = useQuery({
     queryKey: ["platform", "school-stats"],
     queryFn: () => platformService.getPlatformStats(),
@@ -719,8 +787,146 @@ export function SchoolsScreen() {
     queryFn: () => schoolsService.getSchools({ page_size: 50 }),
   });
 
+  const [search, setSearch] = useState("");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editingSchool, setEditingSchool] = useState<School | null>(null);
+  const [schoolForm, setSchoolForm] = useState<SchoolFormState>(EMPTY_SCHOOL_FORM);
+  const [deleteMatricule, setDeleteMatricule] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+
+  const schools = schoolsQuery.data?.results ?? [];
+  const filteredSchools = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) {
+      return schools;
+    }
+
+    return schools.filter((school) => {
+      const haystack = `${school.name} ${school.short_name || school.shortName || ""} ${school.location || ""} ${school.principal || ""}`.toLowerCase();
+      return haystack.includes(keyword);
+    });
+  }, [schools, search]);
+
+  const invalidateSchoolQueries = React.useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["platform", "schools"] }),
+      queryClient.invalidateQueries({ queryKey: ["platform", "school-stats"] }),
+    ]);
+  }, [queryClient]);
+
+  const createSchoolMutation = useMutation({
+    mutationFn: () =>
+      schoolsService.createSchool({
+        name: schoolForm.name.trim(),
+        short_name: schoolForm.shortName.trim().toUpperCase(),
+        principal: schoolForm.principal.trim(),
+        motto: schoolForm.motto.trim(),
+        description: schoolForm.description.trim(),
+        location: schoolForm.location.trim(),
+        region: schoolForm.region.trim(),
+        division: schoolForm.division.trim(),
+        sub_division: schoolForm.subDivision.trim(),
+        city_village: schoolForm.cityVillage.trim(),
+        address: schoolForm.address.trim(),
+        phone: schoolForm.phone.trim(),
+        email: schoolForm.email.trim(),
+      }),
+    onSuccess: async () => {
+      await invalidateSchoolQueries();
+      setEditorOpen(false);
+      setSchoolForm(EMPTY_SCHOOL_FORM);
+      Alert.alert("School created", "The institutional node has been provisioned.");
+    },
+    onError: (error) => Alert.alert("Provisioning failed", getApiErrorMessage(error)),
+  });
+
+  const updateSchoolMutation = useMutation({
+    mutationFn: () => {
+      if (!editingSchool) {
+        throw new Error("No school selected.");
+      }
+
+      return schoolsService.updateSchool(editingSchool.id, {
+        name: schoolForm.name.trim(),
+        short_name: schoolForm.shortName.trim().toUpperCase(),
+        principal: schoolForm.principal.trim(),
+        motto: schoolForm.motto.trim(),
+        description: schoolForm.description.trim(),
+        location: schoolForm.location.trim(),
+        region: schoolForm.region.trim(),
+        division: schoolForm.division.trim(),
+        sub_division: schoolForm.subDivision.trim(),
+        city_village: schoolForm.cityVillage.trim(),
+        address: schoolForm.address.trim(),
+        phone: schoolForm.phone.trim(),
+        email: schoolForm.email.trim(),
+      });
+    },
+    onSuccess: async () => {
+      await invalidateSchoolQueries();
+      setEditorOpen(false);
+      setEditingSchool(null);
+      setSchoolForm(EMPTY_SCHOOL_FORM);
+      Alert.alert("School updated", "The school record has been updated.");
+    },
+    onError: (error) => Alert.alert("Update failed", getApiErrorMessage(error)),
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      schoolsService.toggleSchoolStatus(id, { status }),
+    onSuccess: async () => {
+      await invalidateSchoolQueries();
+      Alert.alert("Node updated", "The school status has been changed.");
+    },
+    onError: (error) => Alert.alert("Status change failed", getApiErrorMessage(error)),
+  });
+
+  const deleteSchoolMutation = useMutation({
+    mutationFn: () => {
+      if (!editingSchool) {
+        throw new Error("No school selected.");
+      }
+      return schoolsService.deleteSchool(editingSchool.id, {
+        matricule: deleteMatricule.trim(),
+        password: deletePassword,
+      });
+    },
+    onSuccess: async () => {
+      await invalidateSchoolQueries();
+      setDeleteOpen(false);
+      setEditorOpen(false);
+      setEditingSchool(null);
+      setDeleteMatricule("");
+      setDeletePassword("");
+      Alert.alert("School removed", "The institutional node has been deleted.");
+    },
+    onError: (error) => Alert.alert("Delete failed", getApiErrorMessage(error)),
+  });
+
+  function openCreateSchool() {
+    setEditingSchool(null);
+    setSchoolForm(EMPTY_SCHOOL_FORM);
+    setEditorOpen(true);
+  }
+
+  function openEditSchool(school: School) {
+    setEditingSchool(school);
+    setSchoolForm(hydrateSchoolForm(school));
+    setEditorOpen(true);
+  }
+
   return (
-    <Screen title="Schools" subtitle="Institution registry">
+    <Screen
+      title="Schools"
+      subtitle="Institution registry"
+      rightAction={
+        canManageSchools ? (
+          <AppButton compact label="Add School" onPress={openCreateSchool} />
+        ) : undefined
+      }
+    >
       <View style={{ gap: 12 }}>
         <StatCard label="Total Schools" value={statsQuery.data?.total_schools ?? 0} helper="Registered school nodes." />
         <StatCard label="Active Schools" value={statsQuery.data?.active_schools ?? 0} helper="Nodes currently active." tone="success" />
@@ -728,12 +934,19 @@ export function SchoolsScreen() {
         <StatCard label="Total Teachers" value={statsQuery.data?.total_teachers ?? 0} helper="Teaching workforce across the network." />
       </View>
 
+      <Field
+        label="Search"
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search by school, code, principal, or location"
+      />
+
       <SectionTitle title="Institution Registry" />
       {schoolsQuery.isLoading && !schoolsQuery.data ? (
         <LoadingState label="Loading schools..." />
-      ) : (schoolsQuery.data?.results ?? []).length ? (
+      ) : filteredSchools.length ? (
         <View style={{ gap: 12 }}>
-          {(schoolsQuery.data?.results ?? []).map((school) => (
+          {filteredSchools.map((school) => (
             <Card key={school.id}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                 <UserAvatar name={school.name} uri={school.logo} size={54} />
@@ -754,12 +967,176 @@ export function SchoolsScreen() {
               <Text style={{ color: palette.textMuted }}>
                 {school.student_count ?? 0} students • {school.teacher_count ?? 0} teachers
               </Text>
+              <Text style={{ color: palette.textMuted }}>
+                Principal: {school.principal || "Not recorded"}
+              </Text>
+              {canManageSchools ? (
+                <View style={{ gap: 10 }}>
+                  <AppButton
+                    label="Manage School"
+                    variant="secondary"
+                    onPress={() => openEditSchool(school)}
+                  />
+                  <AppButton
+                    label={school.status === "Active" ? "Suspend Node" : "Activate Node"}
+                    variant="ghost"
+                    onPress={() =>
+                      toggleStatusMutation.mutate({
+                        id: school.id,
+                        status: school.status === "Active" ? "Suspended" : "Active",
+                      })
+                    }
+                    loading={toggleStatusMutation.isPending}
+                  />
+                </View>
+              ) : null}
             </Card>
           ))}
         </View>
       ) : (
         <EmptyState title="No schools found" description="Registered schools will appear here." />
       )}
+
+      <ModalSheet
+        visible={editorOpen}
+        title={editingSchool ? "Manage School" : "Add School"}
+        onClose={() => {
+          setEditorOpen(false);
+          setEditingSchool(null);
+          setSchoolForm(EMPTY_SCHOOL_FORM);
+        }}
+      >
+        <View style={{ gap: 16 }}>
+          <Field
+            label="School Name"
+            value={schoolForm.name}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, name: value }))}
+            placeholder="Government Bilingual High School"
+          />
+          <Field
+            label="Short Name"
+            value={schoolForm.shortName}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, shortName: value }))}
+            placeholder="GBHS"
+            autoCapitalize="characters"
+          />
+          <Field
+            label="Principal"
+            value={schoolForm.principal}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, principal: value }))}
+            placeholder="Principal name"
+          />
+          <Field
+            label="Email"
+            value={schoolForm.email}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, email: value }))}
+            placeholder="admin@school.edu"
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <Field
+            label="Phone"
+            value={schoolForm.phone}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, phone: value }))}
+            placeholder="+237..."
+            keyboardType="phone-pad"
+          />
+          <OptionChips
+            label="Region"
+            options={REGION_OPTIONS.map((region) => ({ label: region, value: region }))}
+            value={schoolForm.region}
+            onChange={(value) => setSchoolForm((current) => ({ ...current, region: value }))}
+          />
+          <Field
+            label="Division"
+            value={schoolForm.division}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, division: value }))}
+            placeholder="Division"
+          />
+          <Field
+            label="Sub Division"
+            value={schoolForm.subDivision}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, subDivision: value }))}
+            placeholder="Sub division"
+          />
+          <Field
+            label="City / Village"
+            value={schoolForm.cityVillage}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, cityVillage: value }))}
+            placeholder="City or village"
+          />
+          <Field
+            label="Location"
+            value={schoolForm.location}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, location: value }))}
+            placeholder="Douala, Littoral"
+          />
+          <Field
+            label="Address"
+            value={schoolForm.address}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, address: value }))}
+            placeholder="Street address"
+            multiline
+          />
+          <Field
+            label="Motto"
+            value={schoolForm.motto}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, motto: value }))}
+            placeholder="Discipline - Work - Success"
+          />
+          <Field
+            label="Description"
+            value={schoolForm.description}
+            onChangeText={(value) => setSchoolForm((current) => ({ ...current, description: value }))}
+            placeholder="Institution description"
+            multiline
+          />
+          <AppButton
+            label={editingSchool ? "Save School" : "Create School"}
+            onPress={() =>
+              editingSchool ? updateSchoolMutation.mutate() : createSchoolMutation.mutate()
+            }
+            loading={createSchoolMutation.isPending || updateSchoolMutation.isPending}
+          />
+          {editingSchool && canManageSchools ? (
+            <AppButton
+              label="Delete School"
+              variant="danger"
+              onPress={() => setDeleteOpen(true)}
+            />
+          ) : null}
+        </View>
+      </ModalSheet>
+
+      <ModalSheet
+        visible={deleteOpen}
+        title="Delete School"
+        onClose={() => setDeleteOpen(false)}
+      >
+        <View style={{ gap: 16 }}>
+          <Text style={{ color: palette.textMuted }}>
+            Confirm deletion with your own matricule and password.
+          </Text>
+          <Field
+            label="Your Matricule"
+            value={deleteMatricule}
+            onChangeText={setDeleteMatricule}
+            placeholder="Matricule"
+          />
+          <PasswordField
+            label="Your Password"
+            value={deletePassword}
+            onChangeText={setDeletePassword}
+            placeholder="Password"
+          />
+          <AppButton
+            label="Delete School"
+            variant="danger"
+            onPress={() => deleteSchoolMutation.mutate()}
+            loading={deleteSchoolMutation.isPending}
+          />
+        </View>
+      </ModalSheet>
     </Screen>
   );
 }

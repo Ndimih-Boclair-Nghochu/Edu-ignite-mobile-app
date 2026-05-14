@@ -241,7 +241,7 @@ export function Navigation() {
             <Stack.Screen
               name="Conversation"
               component={ConversationScreen}
-              options={({ route }) => ({ title: route.params.title ?? "Conversation" })}
+              options={{ headerShown: false }}
             />
           </>
         )}

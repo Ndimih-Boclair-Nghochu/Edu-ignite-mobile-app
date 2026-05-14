@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
 import { Alert, Image } from "react-native";
-import { AppButton, Card, Field, Screen, SuccessInline } from "@/components/ui";
+import { AppButton, Card, Field, PasswordField, Screen, SuccessInline } from "@/components/ui";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { authService } from "@/lib/api/services/auth.service";
@@ -72,17 +72,15 @@ export function ActivateAccountScreen({ navigation }: Props) {
           onChangeText={setMatricule}
           placeholder="Enter the activation matricule"
         />
-        <Field
+        <PasswordField
           label="New Password"
           value={password}
-          secureTextEntry
           onChangeText={setPassword}
           placeholder="Choose a strong password"
         />
-        <Field
+        <PasswordField
           label="Confirm Password"
           value={confirmPassword}
-          secureTextEntry
           onChangeText={setConfirmPassword}
           placeholder="Repeat the new password"
         />

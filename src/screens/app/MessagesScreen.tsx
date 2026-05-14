@@ -2,14 +2,32 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import React, { useDeferredValue, useMemo, useState } from "react";
-import { Alert, Text, View } from "react-native";
-import { AppButton, Card, EmptyState, Field, LoadingState, Screen, SectionTitle, Tag, UserAvatar } from "@/components/ui";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  Card,
+  EmptyState,
+  Field,
+  LoadingState,
+  Screen,
+  SectionTitle,
+  Tag,
+  UserAvatar,
+} from "@/components/ui";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { chatService } from "@/lib/api/services/chat.service";
+import { Conversation, RelatedChatUser } from "@/lib/api/types";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDateTime, formatRole } from "@/lib/utils/format";
 import { RootStackParamList } from "@/navigation/types";
 import { useSync } from "@/providers/SyncProvider";
+import { palette, theme } from "@/theme";
 
 export function MessagesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -31,10 +49,7 @@ export function MessagesScreen() {
     mutationFn: (userId: string) => chatService.getOrCreateDirect(userId),
     onSuccess: (conversation, userId) => {
       const relatedUser = (relatedUsersQuery.data ?? []).find((entry) => entry.id === userId);
-      navigation.navigate("Conversation", {
-        conversationId: conversation.id,
-        title: relatedUser?.name ?? conversation.name ?? "Conversation",
-      });
+      openConversation(conversation, relatedUser?.name ?? conversation.name ?? "Conversation");
     },
     onError: (error) => {
       Alert.alert("Could not open chat", getApiErrorMessage(error));
@@ -49,122 +64,214 @@ export function MessagesScreen() {
     }
 
     return rows.filter((conversation) => {
-      const participantNames = conversation.participants.map((participant) => participant.name).join(" ");
+      const participantNames = conversation.participants
+        .map((participant) => participant.name)
+        .join(" ");
       const haystack = `${conversation.name ?? ""} ${conversation.last_message ?? ""} ${participantNames}`.toLowerCase();
       return haystack.includes(keyword);
     });
   }, [conversationsQuery.data?.results, deferredSearch]);
 
+  function openConversation(conversation: Conversation, title: string) {
+    navigation.navigate("Conversation", {
+      conversationId: conversation.id,
+      title,
+    });
+  }
+
+  function findDirectConversation(person: RelatedChatUser) {
+    return (conversationsQuery.data?.results ?? []).find(
+      (conversation) =>
+        conversation.conversation_type === "direct" &&
+        conversation.participants.some((participant) => participant.id === person.id)
+    );
+  }
+
+  function handleDirectOpen(person: RelatedChatUser) {
+    const existingConversation = findDirectConversation(person);
+    if (existingConversation) {
+      openConversation(existingConversation, person.name);
+      return;
+    }
+
+    if (!isOnline) {
+      Alert.alert(
+        "Chat unavailable",
+        "Open this conversation online once so it can stay available on this device."
+      );
+      return;
+    }
+
+    createDirectMutation.mutate(person.id);
+  }
+
   return (
-    <Screen
-      title="Messages"
-      subtitle="Direct and group conversations connected to the same shared EduIgnite chat backend."
-    >
+    <Screen title="Messages" subtitle="Conversations">
       <Field
         label="Search"
         value={search}
         onChangeText={setSearch}
-        placeholder="Search by name, message, or group title"
+        placeholder="Search chats or people"
       />
 
-      <SectionTitle
-        title="Quick Contacts"
-        subtitle="Open a direct conversation with the users already related to this account."
-      />
+      <SectionTitle title="People" />
       {relatedUsersQuery.isLoading && !relatedUsersQuery.data ? (
-        <LoadingState label="Loading chat contacts..." />
+        <LoadingState label="Loading people..." />
       ) : (relatedUsersQuery.data ?? []).length ? (
-        <View style={{ gap: 12 }}>
-          {(relatedUsersQuery.data ?? []).slice(0, 6).map((person) => (
-            <Card key={person.id}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                <UserAvatar name={person.name} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: "800", color: "#102032", fontSize: 15 }}>
-                    {person.name}
-                  </Text>
-                  <Text style={{ color: "#667085" }}>{formatRole(person.role)}</Text>
-                </View>
-                <AppButton
-                  compact
-                  label="Chat"
-                  onPress={() => {
-                    if (!isOnline) {
-                      Alert.alert(
-                        "Temporarily unavailable",
-                        "Opening a new direct conversation requires the backend to be reachable right now."
-                      );
-                      return;
-                    }
-                    createDirectMutation.mutate(person.id);
-                  }}
-                />
-              </View>
-            </Card>
-          ))}
-        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.peopleRow}>
+            {(relatedUsersQuery.data ?? []).map((person) => (
+              <Pressable
+                key={person.id}
+                onPress={() => handleDirectOpen(person)}
+                style={({ pressed }) => [
+                  styles.personChip,
+                  pressed ? styles.pressed : null,
+                ]}
+              >
+                <UserAvatar name={person.name} uri={person.avatar} size={58} />
+                <Text numberOfLines={1} style={styles.personName}>
+                  {person.name}
+                </Text>
+                <Text numberOfLines={1} style={styles.personRole}>
+                  {formatRole(person.role)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
       ) : (
-        <EmptyState
-          title="No related users yet"
-          description="Direct contacts will appear here once the backend returns the connected school or family relationships."
-        />
+        <EmptyState title="No people yet" description="Related contacts will appear here." />
       )}
 
-      <SectionTitle
-        title="Conversation Inbox"
-        subtitle="The latest cached or live chat threads for this account."
-      />
+      <SectionTitle title="Chats" />
       {conversationsQuery.isLoading && !conversationsQuery.data ? (
-        <LoadingState label="Loading conversations..." />
+        <LoadingState label="Loading chats..." />
       ) : filteredConversations.length ? (
-        <View style={{ gap: 12 }}>
-          {filteredConversations.map((conversation) => (
-            <Card key={conversation.id}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                <UserAvatar
-                  name={
-                    conversation.name ??
-                    conversation.participants.map((participant) => participant.name).join(" ")
-                  }
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>
-                    {conversation.name ||
-                      conversation.participants.map((participant) => participant.name).join(", ")}
-                  </Text>
-                  <Text style={{ color: "#667085", lineHeight: 19 }}>
-                    {conversation.last_message || "No message preview yet"}
-                  </Text>
-                  <Text style={{ color: "#667085", fontSize: 12, marginTop: 6 }}>
-                    {formatDateTime(conversation.last_message_at)}
-                  </Text>
-                </View>
-              </View>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                <Tag label={conversation.conversation_type} />
-                <Tag label={`${conversation.unread_count ?? 0} unread`} tone="warning" />
-              </View>
-              <AppButton
-                label="Open Conversation"
-                variant="secondary"
-                onPress={() =>
-                  navigation.navigate("Conversation", {
-                    conversationId: conversation.id,
-                    title:
-                      conversation.name ||
-                      conversation.participants.map((participant) => participant.name).join(", "),
-                  })
-                }
-              />
-            </Card>
-          ))}
+        <View style={{ gap: 10 }}>
+          {filteredConversations.map((conversation) => {
+            const conversationTitle =
+              conversation.name ||
+              conversation.participants.map((participant) => participant.name).join(", ");
+            const initialsName = conversation.name || conversationTitle;
+
+            return (
+              <Pressable
+                key={conversation.id}
+                onPress={() => openConversation(conversation, conversationTitle)}
+                style={({ pressed }) => [pressed ? styles.pressed : null]}
+              >
+                <Card style={styles.chatRow}>
+                  <UserAvatar name={initialsName} size={58} />
+                  <View style={styles.chatMeta}>
+                    <View style={styles.chatTopRow}>
+                      <Text numberOfLines={1} style={styles.chatTitle}>
+                        {conversationTitle}
+                      </Text>
+                      <Text style={styles.chatTime}>
+                        {formatDateTime(conversation.last_message_at)}
+                      </Text>
+                    </View>
+                    <View style={styles.chatBottomRow}>
+                      <Text numberOfLines={2} style={styles.chatPreview}>
+                        {conversation.last_message || "No message yet"}
+                      </Text>
+                      {(conversation.unread_count ?? 0) > 0 ? (
+                        <View style={styles.unreadBadge}>
+                          <Text style={styles.unreadText}>
+                            {conversation.unread_count}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Tag label={conversation.conversation_type} />
+                      )}
+                    </View>
+                  </View>
+                </Card>
+              </Pressable>
+            );
+          })}
         </View>
       ) : (
-        <EmptyState
-          title="No conversations match"
-          description="Try another search or start a direct chat from the quick contacts section."
-        />
+        <EmptyState title="No chats found" description="Your conversation history will appear here." />
       )}
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  peopleRow: {
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    paddingVertical: 4,
+  },
+  personChip: {
+    width: 96,
+    alignItems: "center",
+    gap: 8,
+  },
+  personName: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: palette.text,
+    textAlign: "center",
+    width: "100%",
+  },
+  personRole: {
+    fontSize: 11,
+    color: palette.textMuted,
+    textAlign: "center",
+    width: "100%",
+  },
+  chatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  chatMeta: {
+    flex: 1,
+    gap: 8,
+  },
+  chatTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  chatTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "800",
+    color: palette.text,
+  },
+  chatTime: {
+    fontSize: 11,
+    color: palette.textMuted,
+  },
+  chatBottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  chatPreview: {
+    flex: 1,
+    color: palette.textMuted,
+    lineHeight: 19,
+  },
+  unreadBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.secondary,
+  },
+  unreadText: {
+    color: palette.primary,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  pressed: {
+    opacity: 0.9,
+  },
+});

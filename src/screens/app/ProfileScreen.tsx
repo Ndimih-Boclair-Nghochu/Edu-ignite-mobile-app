@@ -6,6 +6,7 @@ import {
   Card,
   Field,
   HeroCard,
+  PasswordField,
   Screen,
   SectionTitle,
   UserAvatar,
@@ -199,26 +200,23 @@ export function ProfileScreen() {
 
       <Card>
         <SectionTitle title="Password" />
-        <Field
+        <PasswordField
           label="Current Password"
           value={currentPassword}
           onChangeText={setCurrentPassword}
           placeholder="Current password"
-          secureTextEntry
         />
-        <Field
+        <PasswordField
           label="New Password"
           value={newPassword}
           onChangeText={setNewPassword}
           placeholder="New password"
-          secureTextEntry
         />
-        <Field
+        <PasswordField
           label="Confirm Password"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           placeholder="Confirm new password"
-          secureTextEntry
         />
         <AppButton
           label="Change Password"

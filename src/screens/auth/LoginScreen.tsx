@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { HeroCard, Field, Screen, AppButton, Card, SuccessInline } from "@/components/ui";
+import { HeroCard, Field, PasswordField, Screen, AppButton, Card, SuccessInline } from "@/components/ui";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { platformService } from "@/lib/api/services/platform.service";
@@ -83,10 +83,9 @@ export function LoginScreen({ navigation }: Props) {
               onChangeText={setMatricule}
               placeholder="Enter account matricule"
             />
-            <Field
+            <PasswordField
               label="Password"
               value={password}
-              secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="password"
