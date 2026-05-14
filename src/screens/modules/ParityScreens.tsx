@@ -11,6 +11,7 @@ import {
   SectionTitle,
   StatCard,
   Tag,
+  UserAvatar,
 } from "@/components/ui";
 import { isExecutiveRole, isSchoolAdminRole } from "@/features/roles";
 import { getApiErrorMessage } from "@/lib/api/errors";
@@ -25,8 +26,10 @@ import { platformService } from "@/lib/api/services/platform.service";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { staffRemarksService } from "@/lib/api/services/staff-remarks.service";
 import { studentsService } from "@/lib/api/services/students.service";
+import { pickImageUpload } from "@/lib/uploads";
 import { formatDate, formatDateTime, formatMoney, formatRole } from "@/lib/utils/format";
 import { useAuth } from "@/providers/AuthProvider";
+import { palette } from "@/theme";
 
 function openPayloadIfPossible(payload: any) {
   const possibleUrl =
@@ -357,8 +360,15 @@ export function SchoolSettingsScreen() {
   });
 
   const [name, setName] = useState("");
+  const [shortName, setShortName] = useState("");
   const [principal, setPrincipal] = useState("");
   const [motto, setMotto] = useState("");
+  const [description, setDescription] = useState("");
+  const [region, setRegion] = useState("");
+  const [division, setDivision] = useState("");
+  const [subDivision, setSubDivision] = useState("");
+  const [cityVillage, setCityVillage] = useState("");
+  const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
 
@@ -367,8 +377,15 @@ export function SchoolSettingsScreen() {
       return;
     }
     setName(schoolQuery.data.name || "");
+    setShortName(schoolQuery.data.short_name || schoolQuery.data.shortName || "");
     setPrincipal(schoolQuery.data.principal || "");
     setMotto(schoolQuery.data.motto || "");
+    setDescription(schoolQuery.data.description || "");
+    setRegion(schoolQuery.data.region || "");
+    setDivision(schoolQuery.data.division || "");
+    setSubDivision(schoolQuery.data.sub_division || schoolQuery.data.subDivision || "");
+    setCityVillage(schoolQuery.data.city_village || schoolQuery.data.cityVillage || "");
+    setAddress(schoolQuery.data.address || "");
     setPhone(schoolQuery.data.phone || "");
     setEmail(schoolQuery.data.email || "");
   }, [schoolQuery.data]);
@@ -377,8 +394,16 @@ export function SchoolSettingsScreen() {
     mutationFn: () =>
       schoolsService.updateSchool(schoolQuery.data?.id || "", {
         name,
+        short_name: shortName,
         principal,
         motto,
+        description,
+        region,
+        division,
+        sub_division: subDivision,
+        city_village: cityVillage,
+        address,
+        location: [cityVillage, region].filter(Boolean).join(", "),
         phone,
         email,
       }),
@@ -389,22 +414,112 @@ export function SchoolSettingsScreen() {
     onError: (error) => Alert.alert("Save failed", getApiErrorMessage(error)),
   });
 
+  const uploadLogoMutation = useMutation({
+    mutationFn: async () => {
+      if (!schoolQuery.data?.id) {
+        throw new Error("School not found.");
+      }
+      const file = await pickImageUpload({ aspect: [1, 1], quality: 0.9 });
+      if (!file) {
+        return null;
+      }
+      return schoolsService.uploadLogo(schoolQuery.data.id, file);
+    },
+    onSuccess: async (payload) => {
+      if (!payload) {
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["schools", "me"] });
+      Alert.alert("Logo updated", "The school logo has been updated.");
+    },
+    onError: (error) => Alert.alert("Upload failed", getApiErrorMessage(error)),
+  });
+
+  const uploadBannerMutation = useMutation({
+    mutationFn: async () => {
+      if (!schoolQuery.data?.id) {
+        throw new Error("School not found.");
+      }
+      const file = await pickImageUpload({ aspect: [16, 9], quality: 0.9 });
+      if (!file) {
+        return null;
+      }
+      return schoolsService.uploadBanner(schoolQuery.data.id, file);
+    },
+    onSuccess: async (payload) => {
+      if (!payload) {
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["schools", "me"] });
+      Alert.alert("Banner updated", "The school banner has been updated.");
+    },
+    onError: (error) => Alert.alert("Upload failed", getApiErrorMessage(error)),
+  });
+
   return (
     <Screen
       title="Manage Settings"
-      subtitle="School identity and contact settings connected to the same backend used on web."
+      subtitle="Institution profile"
     >
       {schoolQuery.isLoading && !schoolQuery.data ? (
         <LoadingState label="Loading school settings..." />
       ) : (
-        <Card>
-          <Field label="School Name" value={name} onChangeText={setName} placeholder="School name" />
-          <Field label="Principal" value={principal} onChangeText={setPrincipal} placeholder="Principal name" />
-          <Field label="Motto" value={motto} onChangeText={setMotto} placeholder="School motto" />
-          <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="School phone" />
-          <Field label="Email" value={email} onChangeText={setEmail} placeholder="School email" />
-          <AppButton label="Save School Settings" onPress={() => updateMutation.mutate()} loading={updateMutation.isPending} />
-        </Card>
+        <View style={{ gap: 16 }}>
+          <Card>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+              <UserAvatar
+                name={schoolQuery.data?.name}
+                uri={schoolQuery.data?.logo}
+                size={78}
+              />
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={{ fontWeight: "900", fontSize: 20, color: palette.text }}>
+                  {schoolQuery.data?.name || "School"}
+                </Text>
+                <Text style={{ color: palette.textMuted }}>
+                  {schoolQuery.data?.short_name || schoolQuery.data?.shortName || "No short name"}
+                </Text>
+              </View>
+            </View>
+            <AppButton
+              label="Update Logo"
+              variant="secondary"
+              onPress={() => uploadLogoMutation.mutate()}
+              loading={uploadLogoMutation.isPending}
+            />
+            <AppButton
+              label="Update Banner"
+              variant="ghost"
+              onPress={() => uploadBannerMutation.mutate()}
+              loading={uploadBannerMutation.isPending}
+            />
+          </Card>
+
+          <Card>
+            <SectionTitle title="Institution Identity" />
+            <Field label="School Name" value={name} onChangeText={setName} placeholder="School name" />
+            <Field label="Short Name" value={shortName} onChangeText={setShortName} placeholder="GBHS P" />
+            <Field label="Principal" value={principal} onChangeText={setPrincipal} placeholder="Principal name" />
+            <Field label="Motto" value={motto} onChangeText={setMotto} placeholder="School motto" />
+            <Field label="Description" value={description} onChangeText={setDescription} placeholder="Institution description" multiline />
+          </Card>
+
+          <Card>
+            <SectionTitle title="Registry & Contact" />
+            <Field label="Region" value={region} onChangeText={setRegion} placeholder="Region" />
+            <Field label="Division" value={division} onChangeText={setDivision} placeholder="Division" />
+            <Field label="Sub Division" value={subDivision} onChangeText={setSubDivision} placeholder="Sub division" />
+            <Field label="City / Village" value={cityVillage} onChangeText={setCityVillage} placeholder="City or village" />
+            <Field label="Address" value={address} onChangeText={setAddress} placeholder="Street address" multiline />
+            <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="School phone" keyboardType="phone-pad" />
+            <Field label="Email" value={email} onChangeText={setEmail} placeholder="School email" keyboardType="email-address" autoCapitalize="none" />
+            <AppButton
+              label="Save School Settings"
+              onPress={() => updateMutation.mutate()}
+              loading={updateMutation.isPending}
+            />
+          </Card>
+        </View>
       )}
     </Screen>
   );

@@ -3,7 +3,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import { Text, View } from "react-native";
-import { AppButton, Card, HeroCard, Screen, SectionTitle } from "@/components/ui";
+import { AppButton, Card, HeroCard, Screen, SectionTitle, UserAvatar } from "@/components/ui";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { getModulesForRole } from "@/features/modules";
 import { isExecutiveRole } from "@/features/roles";
@@ -42,17 +42,36 @@ export function DashboardScreen() {
     ? t("executiveOverview", "Platform overview")
     : schoolQuery.data?.short_name || user?.school?.short_name || t("schoolOverview", "School overview");
 
+  const workspaceLogo = executive
+    ? platformSettingsQuery.data?.logo
+    : schoolQuery.data?.logo || user?.school?.logo;
+
   return (
     <Screen
       title={t("overview", "Overview")}
-      subtitle="The mobile dashboard now follows the same live role logic and backend scope used by the web platform."
+      subtitle={workspaceTitle}
       rightAction={<LanguageToggle />}
     >
       <HeroCard
         eyebrow={eyebrow}
         title={workspaceTitle}
-        description={`${formatRole(user?.role)} account connected to the same shared EduIgnite records used on web.`}
+        description={formatRole(user?.role)}
       />
+
+      <Card>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+          <UserAvatar name={user?.name} uri={user?.avatar} size={62} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontWeight: "900", fontSize: 18, color: "#102032" }}>
+              {user?.name}
+            </Text>
+            <Text style={{ color: "#667085" }}>
+              {user?.matricule || formatRole(user?.role)}
+            </Text>
+          </View>
+          {workspaceLogo ? <UserAvatar name={workspaceTitle} uri={workspaceLogo} size={52} /> : null}
+        </View>
+      </Card>
 
       <RoleDashboardPanel />
 

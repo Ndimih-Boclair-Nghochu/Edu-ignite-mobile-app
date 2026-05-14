@@ -8,9 +8,9 @@ const LANGUAGE_STORAGE_KEY = "eduignite_mobile_language";
 const translations = {
   en: {
     landingEyebrow: "Connected Education Infrastructure",
-    landingTitle: "One EduIgnite platform across web and mobile.",
+    landingTitle: "One platform for every school story.",
     landingSubtitle:
-      "Use the same live backend, the same roles, and the same institutional records from a production-ready mobile workspace.",
+      "Secure academic operations for founders, schools, staff, learners, and families.",
     login: "Login",
     activateAccount: "Activate Account",
     overview: "Overview",
@@ -31,9 +31,9 @@ const translations = {
   },
   fr: {
     landingEyebrow: "Infrastructure educative connectee",
-    landingTitle: "Une seule plateforme EduIgnite sur le web et le mobile.",
+    landingTitle: "Une seule plateforme pour chaque histoire scolaire.",
     landingSubtitle:
-      "Utilisez le meme backend en direct, les memes roles et les memes dossiers institutionnels depuis un espace mobile pret pour la production.",
+      "Des operations scolaires securisees pour les fondateurs, les ecoles, le personnel, les apprenants et les familles.",
     login: "Connexion",
     activateAccount: "Activer le compte",
     overview: "Vue d'ensemble",

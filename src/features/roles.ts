@@ -21,10 +21,16 @@ export const STAFF_ROLES: UserRole[] = [
   "LIBRARIAN",
 ];
 
+export const PRIMARY_FOUNDER_ROLES: UserRole[] = ["CEO", "CTO"];
+
 export function isExecutiveRole(role?: UserRole | string | null): boolean {
   return EXECUTIVE_ROLES.includes((role ?? "") as UserRole);
 }
 
 export function isSchoolAdminRole(role?: UserRole | string | null): boolean {
   return SCHOOL_ADMIN_ROLES.includes((role ?? "") as UserRole);
+}
+
+export function isPrimaryFounderRole(role?: UserRole | string | null): boolean {
+  return PRIMARY_FOUNDER_ROLES.includes((role ?? "") as UserRole);
 }

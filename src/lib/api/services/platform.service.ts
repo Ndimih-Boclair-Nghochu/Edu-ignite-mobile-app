@@ -2,6 +2,7 @@ import { apiClient } from '../client';
 import { API } from '../endpoints';
 import { normalizePlatformSettings } from '../normalizers';
 import { resolveMediaUrl } from '@/lib/media';
+import { UploadableFile } from '@/lib/uploads';
 import {
   PlatformSettings,
   PublicEvent,
@@ -24,9 +25,9 @@ export const platformService = {
     return normalizePlatformSettings(data);
   },
 
-  async uploadLogo(file: File): Promise<{ logo_url: string }> {
+  async uploadLogo(file: UploadableFile): Promise<{ logo_url: string }> {
     const formData = new FormData();
-    formData.append('logo', file);
+    formData.append('logo', file as any);
     const { data } = await apiClient.post(API.PLATFORM.UPLOAD_LOGO, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -36,9 +37,9 @@ export const platformService = {
     };
   },
 
-  async uploadEventMedia(file: File): Promise<{ media_url: string; media_type: "video" | "image" }> {
+  async uploadEventMedia(file: UploadableFile): Promise<{ media_url: string; media_type: "video" | "image" }> {
     const formData = new FormData();
-    formData.append('media', file);
+    formData.append('media', file as any);
     const { data } = await apiClient.post(API.PLATFORM.UPLOAD_EVENT_MEDIA, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

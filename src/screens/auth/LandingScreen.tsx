@@ -2,9 +2,9 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
-import { AppButton, Card, HeroCard, Screen, StatCard } from "@/components/ui";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { AppButton } from "@/components/ui";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { communityService } from "@/lib/api/services/community.service";
 import { platformService } from "@/lib/api/services/platform.service";
 import { RootStackParamList } from "@/navigation/types";
 import { useI18n } from "@/providers/I18nProvider";
@@ -20,59 +20,35 @@ export function LandingScreen({ navigation }: Props) {
     queryFn: () => platformService.getPlatformSettings(),
   });
 
-  const publicStatsQuery = useQuery({
-    queryKey: ["platform", "landing", "community-preview"],
-    queryFn: async () => {
-      const [blogs, testimonies] = await Promise.all([
-        communityService.getBlogs({ page_size: 6 }),
-        communityService.getTestimonies({ page_size: 6 }),
-      ]);
-      return {
-        blogs: blogs.count ?? blogs.results?.length ?? 0,
-        testimonies: testimonies.count ?? testimonies.results?.length ?? 0,
-      };
-    },
-  });
-
   const platformName = platformSettingsQuery.data?.name || "EduIgnite";
   const platformLogo = platformSettingsQuery.data?.logo;
 
   return (
-    <Screen
-      title={platformName}
-      subtitle={t("landingSubtitle")}
-      rightAction={<LanguageToggle />}
-      contentContainerStyle={styles.content}
-    >
-      <HeroCard
-        eyebrow={t("landingEyebrow")}
-        title={t("landingTitle")}
-        description={t("landingSubtitle")}
-      >
-        <View style={styles.heroFooter}>
-          <Text style={styles.heroFooterText}>
-            {platformName} connects executive, school, staff, student, parent, bursar, and library workflows from the same backend.
-          </Text>
-        </View>
-      </HeroCard>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.header}>
+        <LanguageToggle inverse />
+      </View>
 
-      <Card style={styles.brandCard}>
-        <View style={styles.brandRow}>
+      <View style={styles.body}>
+        <View style={styles.logoWrap}>
           {platformLogo ? (
             <Image source={{ uri: platformLogo }} style={styles.logo} resizeMode="contain" />
           ) : (
             <View style={styles.logoFallback}>
-              <Text style={styles.logoFallbackText}>EI</Text>
+              <Text style={styles.logoFallbackText}>
+                {platformName.slice(0, 2).toUpperCase()}
+              </Text>
             </View>
           )}
-          <View style={{ flex: 1 }}>
-            <Text style={styles.brandTitle}>{platformName}</Text>
-            <Text style={styles.brandSubtitle}>
-              Backend identity and visual branding loaded from the live platform settings.
-            </Text>
-          </View>
         </View>
-        <View style={styles.buttonRow}>
+
+        <View style={styles.textBlock}>
+          <Text style={styles.title}>{platformName}</Text>
+          <Text style={styles.subtitle}>{t("landingTitle")}</Text>
+          <Text style={styles.supporting}>{t("landingSubtitle")}</Text>
+        </View>
+
+        <View style={styles.actions}>
           <AppButton label={t("login")} onPress={() => navigation.navigate("Login")} />
           <AppButton
             label={t("activateAccount")}
@@ -80,78 +56,83 @@ export function LandingScreen({ navigation }: Props) {
             onPress={() => navigation.navigate("Activate")}
           />
         </View>
-      </Card>
-
-      <View style={{ gap: 12 }}>
-        <StatCard
-          label="Community Stories"
-          value={publicStatsQuery.data?.blogs ?? 0}
-          helper="Published community and institutional posts."
-        />
-        <StatCard
-          label="Public Testimonies"
-          value={publicStatsQuery.data?.testimonies ?? 0}
-          helper="Approved stories visible on the shared platform."
-          tone="success"
-        />
       </View>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: theme.spacing.lg,
+  safeArea: {
+    flex: 1,
+    backgroundColor: palette.secondary,
   },
-  brandCard: {
-    gap: theme.spacing.lg,
+  header: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+    alignItems: "flex-end",
   },
-  brandRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.md,
-  },
-  logo: {
-    width: 74,
-    height: 74,
-    borderRadius: 22,
-    backgroundColor: palette.surface,
-  },
-  logoFallback: {
-    width: 74,
-    height: 74,
-    borderRadius: 22,
+  body: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: palette.primary,
+    paddingHorizontal: theme.spacing.xl,
+    gap: theme.spacing.xl,
+  },
+  logoWrap: {
+    width: 132,
+    height: 132,
+    borderRadius: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
+  },
+  logo: {
+    width: 104,
+    height: 104,
+  },
+  logoFallback: {
+    width: 104,
+    height: 104,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(38,77,115,0.18)",
   },
   logoFallbackText: {
-    color: palette.surface,
-    fontSize: 24,
+    fontSize: 34,
     fontWeight: "900",
+    color: palette.surface,
   },
-  brandTitle: {
+  textBlock: {
+    gap: theme.spacing.sm,
+    alignItems: "center",
+  },
+  title: {
+    color: palette.surface,
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  subtitle: {
+    color: palette.surface,
     fontSize: 22,
     lineHeight: 28,
-    fontWeight: "900",
-    color: palette.primary,
+    fontWeight: "800",
+    textAlign: "center",
   },
-  brandSubtitle: {
-    marginTop: 4,
-    color: palette.textMuted,
-    lineHeight: 20,
+  supporting: {
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+    maxWidth: 320,
   },
-  buttonRow: {
+  actions: {
+    width: "100%",
+    maxWidth: 320,
     gap: theme.spacing.sm,
-  },
-  heroFooter: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.16)",
-  },
-  heroFooterText: {
-    color: "rgba(255,255,255,0.84)",
-    lineHeight: 20,
   },
 });

@@ -3,6 +3,7 @@ import { API } from '../endpoints';
 import { normalizePaginatedResponse } from '../normalize';
 import { normalizeFounder, normalizeUser } from '../normalizers';
 import { resolveMediaUrl } from '@/lib/media';
+import { UploadableFile } from '@/lib/uploads';
 import {
   User,
   FounderProfile,
@@ -42,9 +43,9 @@ export const usersService = {
     return normalizeUser(response);
   },
 
-  async uploadAvatar(file: File): Promise<{ avatar_url: string }> {
+  async uploadAvatar(file: UploadableFile): Promise<{ avatar_url: string }> {
     const formData = new FormData();
-    formData.append('avatar', file);
+    formData.append('avatar', file as any);
     const { data } = await apiClient.post(API.USERS.UPLOAD_AVATAR, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

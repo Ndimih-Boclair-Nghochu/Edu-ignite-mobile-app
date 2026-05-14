@@ -1,10 +1,15 @@
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useQuery } from "@tanstack/react-query";
 import React, { useMemo } from "react";
 import { Text, View } from "react-native";
-import { AppButton, Card, EmptyState, HeroCard, Screen, SectionTitle } from "@/components/ui";
+import { AppButton, Card, EmptyState, HeroCard, Screen, SectionTitle, UserAvatar } from "@/components/ui";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { getModulesForRole } from "@/features/modules";
+import { isExecutiveRole } from "@/features/roles";
+import { platformService } from "@/lib/api/services/platform.service";
+import { schoolsService } from "@/lib/api/services/schools.service";
+import { PlatformSettings, School } from "@/lib/api/types";
 import { RootStackParamList } from "@/navigation/types";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAuth } from "@/providers/AuthProvider";
@@ -13,6 +18,7 @@ export function WorkspaceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
   const { t } = useI18n();
+  const executive = isExecutiveRole(user?.role);
   const modules = getModulesForRole(user?.role ?? null);
   const groupedModules = useMemo(
     () => ({
@@ -26,17 +32,46 @@ export function WorkspaceScreen() {
     [modules]
   );
 
+  const scopeQuery = useQuery<School | PlatformSettings>({
+    queryKey: executive ? ["platform", "settings", "workspace"] : ["schools", "me", "workspace"],
+    queryFn: () => (executive ? platformService.getPlatformSettings() : schoolsService.getMySchool()),
+    enabled: Boolean(user),
+  });
+
+  const scopeData = scopeQuery.data;
+  const executiveScope = executive ? (scopeData as PlatformSettings | undefined) : undefined;
+  const schoolScope = executive ? undefined : (scopeData as School | undefined);
+  const scopeLogo = executive
+    ? executiveScope?.logo
+    : schoolScope?.logo || user?.school?.logo;
+  const scopeName = executive
+    ? executiveScope?.name || "EduIgnite"
+    : schoolScope?.name || user?.school?.name || "School";
+
   return (
     <Screen
       title={t("workspace", "Workspace")}
-      subtitle="A full mobile map of the same EduIgnite operations available on the shared web backend."
+      subtitle={scopeName}
       rightAction={<LanguageToggle />}
     >
       <HeroCard
-        eyebrow="Full Access Workspace"
+        eyebrow={user?.matricule || "Workspace"}
         title={user?.name ?? "EduIgnite User"}
-        description="Open the same role-specific work areas, records, and backend routes that drive the web platform."
+        description="Role workspace"
       />
+
+      <Card>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+          <UserAvatar name={user?.name} uri={user?.avatar} size={58} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 17, fontWeight: "800", color: "#102032" }}>
+              {scopeName}
+            </Text>
+            <Text style={{ color: "#667085" }}>{user?.role}</Text>
+          </View>
+          {scopeLogo ? <UserAvatar name={scopeName} uri={scopeLogo} size={48} /> : null}
+        </View>
+      </Card>
 
       {modules.length ? (
         <View style={{ gap: 20 }}>

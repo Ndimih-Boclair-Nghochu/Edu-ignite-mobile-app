@@ -2,6 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -301,10 +302,37 @@ export function Tag({
   );
 }
 
-export function UserAvatar({ name }: { name?: string | null }) {
+export function UserAvatar({
+  name,
+  uri,
+  size = 44,
+}: {
+  name?: string | null;
+  uri?: string | null;
+  size?: number;
+}) {
   return (
-    <View style={styles.avatar}>
-      <Text style={styles.avatarText}>{getInitials(name)}</Text>
+    <View
+      style={[
+        styles.avatar,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+        },
+      ]}
+    >
+      {uri ? (
+        <Image
+          source={{ uri }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          resizeMode="cover"
+        />
+      ) : (
+        <Text style={[styles.avatarText, { fontSize: Math.max(14, size * 0.36) }]}>
+          {getInitials(name)}
+        </Text>
+      )}
     </View>
   );
 }

@@ -2,6 +2,7 @@ import { apiClient } from '../client';
 import { API } from '../endpoints';
 import { normalizeSchool } from '../normalizers';
 import { resolveMediaUrl } from '@/lib/media';
+import { UploadableFile } from '@/lib/uploads';
 import {
   School,
   SchoolSettings,
@@ -47,9 +48,9 @@ export const schoolsService = {
     return normalizeSchool(data) as School;
   },
 
-  async uploadLogo(id: string, file: File): Promise<{ logo_url: string; logo: string }> {
+  async uploadLogo(id: string, file: UploadableFile): Promise<{ logo_url: string; logo: string }> {
     const formData = new FormData();
-    formData.append('logo', file);
+    formData.append('logo', file as any);
     const { data } = await apiClient.post(`/schools/schools/${id}/upload-logo/`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -60,9 +61,9 @@ export const schoolsService = {
     };
   },
 
-  async uploadBanner(id: string, file: File): Promise<{ banner_url: string; banner: string }> {
+  async uploadBanner(id: string, file: UploadableFile): Promise<{ banner_url: string; banner: string }> {
     const formData = new FormData();
-    formData.append('banner', file);
+    formData.append('banner', file as any);
     const { data } = await apiClient.post(`/schools/schools/${id}/upload-banner/`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

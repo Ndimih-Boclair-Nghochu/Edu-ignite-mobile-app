@@ -7,58 +7,704 @@ import {
   EmptyState,
   Field,
   LoadingState,
+  ModalSheet,
+  OptionChips,
   Screen,
   SectionTitle,
   StatCard,
   Tag,
+  UserAvatar,
 } from "@/components/ui";
+import { isPrimaryFounderRole } from "@/features/roles";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { communityService } from "@/lib/api/services/community.service";
 import { platformService } from "@/lib/api/services/platform.service";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { supportService } from "@/lib/api/services/support.service";
 import { usersService } from "@/lib/api/services/users.service";
+import {
+  FounderAccessLevel,
+  FounderProfile,
+  UpdatePlatformSettingsRequest,
+  UserRole,
+} from "@/lib/api/types";
+import { pickImageUpload } from "@/lib/uploads";
 import { formatDate, formatMoney, formatRole } from "@/lib/utils/format";
+import { useAuth } from "@/providers/AuthProvider";
+import { palette } from "@/theme";
+
+const FOUNDER_ROLE_OPTIONS: Array<{ label: string; value: UserRole }> = [
+  { label: "COO", value: "COO" },
+  { label: "Investor", value: "INV" },
+  { label: "Designer", value: "DESIGNER" },
+  { label: "Super Admin", value: "SUPER_ADMIN" },
+];
+
+const ACCESS_OPTIONS: Array<{ label: string; value: FounderAccessLevel }> = [
+  { label: "Full Access", value: "FULL" },
+  { label: "Read Only", value: "READ_ONLY" },
+];
+
+const FEE_ROLE_ORDER: UserRole[] = [
+  "CEO",
+  "CTO",
+  "SUPER_ADMIN",
+  "COO",
+  "INV",
+  "DESIGNER",
+  "SCHOOL_ADMIN",
+  "SUB_ADMIN",
+  "TEACHER",
+  "STUDENT",
+  "PARENT",
+  "BURSAR",
+  "LIBRARIAN",
+];
+
+type FounderFormState = {
+  name: string;
+  email: string;
+  phone: string;
+  whatsapp: string;
+  role: UserRole;
+  founderTitle: string;
+  primarySharePercentage: string;
+  accessLevel: FounderAccessLevel;
+  hasRenewableShares: boolean;
+  shareRenewalPeriodDays: string;
+};
+
+type ShareFormState = {
+  percentage: string;
+  note: string;
+  durationDays: string;
+};
+
+const EMPTY_FOUNDER_FORM: FounderFormState = {
+  name: "",
+  email: "",
+  phone: "",
+  whatsapp: "",
+  role: "COO",
+  founderTitle: "",
+  primarySharePercentage: "",
+  accessLevel: "FULL",
+  hasRenewableShares: false,
+  shareRenewalPeriodDays: "365",
+};
+
+const EMPTY_SHARE_FORM: ShareFormState = {
+  percentage: "",
+  note: "",
+  durationDays: "365",
+};
+
+function hydrateFounderForm(founder: FounderProfile): FounderFormState {
+  return {
+    name: founder.name,
+    email: founder.email,
+    phone: founder.phone || "",
+    whatsapp: founder.whatsapp || "",
+    role: founder.role,
+    founderTitle: founder.founder_title,
+    primarySharePercentage: founder.primary_share_percentage,
+    accessLevel: founder.access_level,
+    hasRenewableShares: founder.has_renewable_shares,
+    shareRenewalPeriodDays: String(founder.share_renewal_period_days || 365),
+  };
+}
 
 export function FoundersScreen() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canManage = isPrimaryFounderRole(user?.role);
+
   const foundersQuery = useQuery({
     queryKey: ["platform", "founders"],
     queryFn: () => usersService.getFounders(),
   });
 
+  const executivesQuery = useQuery({
+    queryKey: ["platform", "executives"],
+    queryFn: () => usersService.getExecutives({ page_size: 50 }),
+  });
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [sharesOpen, setSharesOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selectedFounder, setSelectedFounder] = useState<FounderProfile | null>(null);
+  const [founderForm, setFounderForm] = useState<FounderFormState>(EMPTY_FOUNDER_FORM);
+  const [shareForm, setShareForm] = useState<ShareFormState>(EMPTY_SHARE_FORM);
+  const [deleteMatricule, setDeleteMatricule] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+
+  const founders = foundersQuery.data ?? [];
+  const executives = executivesQuery.data?.results ?? [];
+
+  const sortedFounders = useMemo(
+    () =>
+      [...founders].sort((left, right) => {
+        if (left.is_primary_founder !== right.is_primary_founder) {
+          return left.is_primary_founder ? -1 : 1;
+        }
+        return Number(right.total_share_percentage) - Number(left.total_share_percentage);
+      }),
+    [founders]
+  );
+
+  const invalidateFounderQueries = React.useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["platform", "founders"] }),
+      queryClient.invalidateQueries({ queryKey: ["platform", "executives"] }),
+    ]);
+  }, [queryClient]);
+
+  const createFounderMutation = useMutation({
+    mutationFn: () =>
+      usersService.createFounder({
+        name: founderForm.name.trim(),
+        email: founderForm.email.trim(),
+        phone: founderForm.phone.trim(),
+        whatsapp: founderForm.whatsapp.trim() || founderForm.phone.trim(),
+        role: founderForm.role as Extract<UserRole, "SUPER_ADMIN" | "COO" | "INV" | "DESIGNER">,
+        founder_title: founderForm.founderTitle.trim(),
+        primary_share_percentage: founderForm.primarySharePercentage.trim(),
+        access_level: founderForm.accessLevel,
+        has_renewable_shares: founderForm.hasRenewableShares,
+        share_renewal_period_days: founderForm.hasRenewableShares
+          ? Number(founderForm.shareRenewalPeriodDays || 365)
+          : undefined,
+      }),
+    onSuccess: async (payload) => {
+      await invalidateFounderQueries();
+      setCreateOpen(false);
+      setFounderForm(EMPTY_FOUNDER_FORM);
+      Alert.alert(
+        "Founder added",
+        `${payload.name} is ready. Activation matricule: ${payload.matricule}.`
+      );
+    },
+    onError: (error) => Alert.alert("Founder creation failed", getApiErrorMessage(error)),
+  });
+
+  const updateFounderMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedFounder) {
+        throw new Error("No founder selected.");
+      }
+      return usersService.updateFounder(selectedFounder.id, {
+        name: founderForm.name.trim(),
+        email: founderForm.email.trim(),
+        phone: founderForm.phone.trim(),
+        whatsapp: founderForm.whatsapp.trim() || founderForm.phone.trim(),
+        role: founderForm.role as Extract<UserRole, "SUPER_ADMIN" | "COO" | "INV" | "DESIGNER">,
+        founder_title: founderForm.founderTitle.trim(),
+        primary_share_percentage: founderForm.primarySharePercentage.trim(),
+        access_level: founderForm.accessLevel,
+        has_renewable_shares: founderForm.hasRenewableShares,
+        share_renewal_period_days: founderForm.hasRenewableShares
+          ? Number(founderForm.shareRenewalPeriodDays || 365)
+          : undefined,
+      });
+    },
+    onSuccess: async () => {
+      await invalidateFounderQueries();
+      setEditOpen(false);
+      setSelectedFounder(null);
+      Alert.alert("Founder updated", "The founder record has been updated.");
+    },
+    onError: (error) => Alert.alert("Founder update failed", getApiErrorMessage(error)),
+  });
+
+  const addSharesMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedFounder) {
+        throw new Error("No founder selected.");
+      }
+      return usersService.addFounderShares(selectedFounder.id, {
+        percentage: shareForm.percentage.trim(),
+        note: shareForm.note.trim(),
+        duration_days: Number(shareForm.durationDays || 365),
+      });
+    },
+    onSuccess: async () => {
+      await invalidateFounderQueries();
+      setSharesOpen(false);
+      setShareForm(EMPTY_SHARE_FORM);
+      setSelectedFounder(null);
+      Alert.alert("Shares added", "The founder share allocation has been recorded.");
+    },
+    onError: (error) => Alert.alert("Share update failed", getApiErrorMessage(error)),
+  });
+
+  const renewSharesMutation = useMutation({
+    mutationFn: (founderId: string) => usersService.renewFounderShares(founderId),
+    onSuccess: async () => {
+      await invalidateFounderQueries();
+      Alert.alert("Shares renewed", "The renewable founder period has been renewed.");
+    },
+    onError: (error) => Alert.alert("Renewal failed", getApiErrorMessage(error)),
+  });
+
+  const removeShareAdjustmentMutation = useMutation({
+    mutationFn: ({
+      founderId,
+      adjustmentId,
+    }: {
+      founderId: string;
+      adjustmentId: string;
+    }) => usersService.removeShareAdjustment(founderId, adjustmentId),
+    onSuccess: async () => {
+      await invalidateFounderQueries();
+      Alert.alert("Adjustment removed", "The expired share adjustment has been removed.");
+    },
+    onError: (error) => Alert.alert("Removal failed", getApiErrorMessage(error)),
+  });
+
+  const deleteFounderMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedFounder) {
+        throw new Error("No founder selected.");
+      }
+      return usersService.deleteFounder(selectedFounder.id, {
+        matricule: deleteMatricule.trim(),
+        password: deletePassword,
+      });
+    },
+    onSuccess: async () => {
+      await invalidateFounderQueries();
+      setDeleteOpen(false);
+      setSelectedFounder(null);
+      setDeleteMatricule("");
+      setDeletePassword("");
+      Alert.alert("Founder removed", "The founder account has been removed.");
+    },
+    onError: (error) => Alert.alert("Removal failed", getApiErrorMessage(error)),
+  });
+
   return (
     <Screen
       title="Founders"
-      subtitle="Founder registry, share structures, and executive participation loaded from the live backend."
+      subtitle="Founder governance"
+      rightAction={
+        canManage ? (
+          <AppButton compact label="Add Founder" onPress={() => setCreateOpen(true)} />
+        ) : undefined
+      }
     >
-      {foundersQuery.isLoading && !foundersQuery.data ? (
+      <View style={{ gap: 12 }}>
+        <StatCard label="Founder Accounts" value={sortedFounders.length} helper="Founder board accounts." />
+        <StatCard
+          label="Primary Founders"
+          value={sortedFounders.filter((founder) => founder.is_primary_founder).length}
+          helper="CEO and CTO with equal protected rights."
+          tone="success"
+        />
+        <StatCard
+          label="Renewable Seats"
+          value={sortedFounders.filter((founder) => founder.has_renewable_shares).length}
+          helper="Founder roles with renewable time windows."
+        />
+      </View>
+
+      <SectionTitle title="Founder Board" />
+      {foundersQuery.isLoading && !founders.length ? (
         <LoadingState label="Loading founders..." />
-      ) : foundersQuery.data?.length ? (
+      ) : sortedFounders.length ? (
         <View style={{ gap: 12 }}>
-          {foundersQuery.data.map((founder) => (
+          {sortedFounders.map((founder) => (
             <Card key={founder.id}>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                <Tag label={founder.founder_title || formatRole(founder.role)} />
-                <Tag label={`${founder.total_share_percentage}%`} tone="success" />
-                <Tag label={founder.access_level} />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                <UserAvatar name={founder.name} uri={founder.avatar} size={68} />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={{ fontWeight: "900", fontSize: 18, color: palette.text }}>
+                    {founder.name}
+                  </Text>
+                  <Text style={{ color: palette.textMuted }}>
+                    {founder.founder_title || formatRole(founder.role)}
+                  </Text>
+                  <Text style={{ color: palette.textMuted }}>{founder.email}</Text>
+                </View>
               </View>
-              <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>
-                {founder.name}
+
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                <Tag label={founder.role} />
+                <Tag
+                  label={founder.access_level === "FULL" ? "Full Access" : "Read Only"}
+                  tone={founder.access_level === "FULL" ? "success" : "warning"}
+                />
+                <Tag label={`${founder.total_share_percentage}%`} tone="success" />
+                {founder.is_primary_founder ? <Tag label="Primary Founder" /> : null}
+              </View>
+
+              <Text style={{ color: palette.textMuted }}>
+                Matricule: {founder.matricule}
               </Text>
-              <Text style={{ color: "#667085", lineHeight: 19 }}>
-                {founder.email} • {formatRole(founder.role)}
-              </Text>
-              <Text style={{ color: "#667085", lineHeight: 19 }}>
-                Renewable shares: {founder.has_renewable_shares ? "Yes" : "No"}
-                {founder.shares_expire_at ? ` • expires ${formatDate(founder.shares_expire_at)}` : ""}
-              </Text>
+              {founder.phone ? (
+                <Text style={{ color: palette.textMuted }}>Phone: {founder.phone}</Text>
+              ) : null}
+
+              {founder.has_renewable_shares ? (
+                <Card style={{ backgroundColor: palette.accent, padding: 14 }}>
+                  <Text style={{ fontWeight: "800", color: palette.text }}>
+                    Renewable cycle: {founder.share_renewal_period_days} days
+                  </Text>
+                  <Text style={{ color: palette.textMuted }}>
+                    {founder.shares_expire_at
+                      ? `Expires ${formatDate(founder.shares_expire_at)}`
+                      : "No expiry date recorded"}
+                  </Text>
+                  {founder.days_until_share_expiry != null ? (
+                    <Text style={{ color: palette.textMuted }}>
+                      {founder.days_until_share_expiry} day(s) remaining
+                    </Text>
+                  ) : null}
+                </Card>
+              ) : null}
+
+              {founder.share_adjustments.length ? (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontWeight: "800", color: palette.text }}>
+                    Share Adjustments
+                  </Text>
+                  {founder.share_adjustments.map((adjustment) => (
+                    <Card
+                      key={adjustment.id}
+                      style={{ backgroundColor: "#F8FAFC", padding: 14 }}
+                    >
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                        <Tag
+                          label={`${adjustment.percentage}%`}
+                          tone={adjustment.is_expired ? "warning" : "success"}
+                        />
+                        <Tag
+                          label={adjustment.is_locked ? "Locked" : "Unlocked"}
+                          tone={adjustment.is_locked ? "default" : "warning"}
+                        />
+                      </View>
+                      {adjustment.note ? (
+                        <Text style={{ color: palette.textMuted }}>{adjustment.note}</Text>
+                      ) : null}
+                      {adjustment.expires_at ? (
+                        <Text style={{ color: palette.textMuted }}>
+                          Expires {formatDate(adjustment.expires_at)}
+                        </Text>
+                      ) : null}
+                      {canManage && !adjustment.is_locked ? (
+                        <AppButton
+                          label="Remove Adjustment"
+                          variant="ghost"
+                          onPress={() =>
+                            removeShareAdjustmentMutation.mutate({
+                              founderId: founder.id,
+                              adjustmentId: adjustment.id,
+                            })
+                          }
+                          loading={removeShareAdjustmentMutation.isPending}
+                        />
+                      ) : null}
+                    </Card>
+                  ))}
+                </View>
+              ) : null}
+
+              {canManage ? (
+                <View style={{ gap: 10 }}>
+                  <AppButton
+                    label="Edit Founder"
+                    variant="secondary"
+                    onPress={() => {
+                      setSelectedFounder(founder);
+                      setFounderForm(hydrateFounderForm(founder));
+                      setEditOpen(true);
+                    }}
+                  />
+                  <AppButton
+                    label="Add Shares"
+                    variant="ghost"
+                    onPress={() => {
+                      setSelectedFounder(founder);
+                      setShareForm(EMPTY_SHARE_FORM);
+                      setSharesOpen(true);
+                    }}
+                  />
+                  {founder.has_renewable_shares ? (
+                    <AppButton
+                      label="Renew Shares"
+                      variant="ghost"
+                      onPress={() => renewSharesMutation.mutate(founder.id)}
+                      loading={renewSharesMutation.isPending}
+                    />
+                  ) : null}
+                  {founder.can_be_removed ? (
+                    <AppButton
+                      label="Remove Founder"
+                      variant="danger"
+                      onPress={() => {
+                        setSelectedFounder(founder);
+                        setDeleteMatricule("");
+                        setDeletePassword("");
+                        setDeleteOpen(true);
+                      }}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
             </Card>
           ))}
         </View>
       ) : (
-        <EmptyState title="No founders yet" description="Founder records will appear here once they exist on the platform." />
+        <EmptyState title="No founders yet" description="Founder records will appear here." />
       )}
+
+      <SectionTitle title="Executive Registry" />
+      {executivesQuery.isLoading && !executives.length ? (
+        <LoadingState label="Loading executives..." />
+      ) : executives.length ? (
+        <View style={{ gap: 12 }}>
+          {executives.map((executive) => (
+            <Card key={executive.id}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <UserAvatar name={executive.name} uri={executive.avatar} size={48} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: "800", color: palette.text }}>
+                    {executive.name}
+                  </Text>
+                  <Text style={{ color: palette.textMuted }}>
+                    {formatRole(executive.role)} • {executive.email}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          ))}
+        </View>
+      ) : (
+        <EmptyState title="No executives found" description="Executive accounts will appear here." />
+      )}
+
+      <ModalSheet
+        visible={createOpen}
+        title="Add Founder"
+        onClose={() => {
+          setCreateOpen(false);
+          setFounderForm(EMPTY_FOUNDER_FORM);
+        }}
+      >
+        <FounderForm
+          form={founderForm}
+          setForm={setFounderForm}
+          submitLabel="Create Founder"
+          onSubmit={() => createFounderMutation.mutate()}
+          loading={createFounderMutation.isPending}
+        />
+      </ModalSheet>
+
+      <ModalSheet
+        visible={editOpen}
+        title="Edit Founder"
+        onClose={() => {
+          setEditOpen(false);
+          setSelectedFounder(null);
+          setFounderForm(EMPTY_FOUNDER_FORM);
+        }}
+      >
+        <FounderForm
+          form={founderForm}
+          setForm={setFounderForm}
+          submitLabel="Save Founder"
+          onSubmit={() => updateFounderMutation.mutate()}
+          loading={updateFounderMutation.isPending}
+          disableProtectedFields={selectedFounder?.is_primary_founder}
+        />
+      </ModalSheet>
+
+      <ModalSheet
+        visible={sharesOpen}
+        title="Add Shares"
+        onClose={() => {
+          setSharesOpen(false);
+          setSelectedFounder(null);
+          setShareForm(EMPTY_SHARE_FORM);
+        }}
+      >
+        <View style={{ gap: 16 }}>
+          <Text style={{ fontWeight: "800", color: palette.text }}>
+            {selectedFounder?.name || "Founder"}
+          </Text>
+          <Field
+            label="Additional Share (%)"
+            value={shareForm.percentage}
+            onChangeText={(value) => setShareForm((current) => ({ ...current, percentage: value }))}
+            placeholder="2.50"
+            keyboardType="numeric"
+          />
+          <Field
+            label="Duration (days)"
+            value={shareForm.durationDays}
+            onChangeText={(value) => setShareForm((current) => ({ ...current, durationDays: value }))}
+            placeholder="365"
+            keyboardType="numeric"
+          />
+          <Field
+            label="Note"
+            value={shareForm.note}
+            onChangeText={(value) => setShareForm((current) => ({ ...current, note: value }))}
+            placeholder="Reason for this board allocation"
+            multiline
+          />
+          <AppButton
+            label="Save Shares"
+            onPress={() => addSharesMutation.mutate()}
+            loading={addSharesMutation.isPending}
+          />
+        </View>
+      </ModalSheet>
+
+      <ModalSheet
+        visible={deleteOpen}
+        title="Remove Founder"
+        onClose={() => {
+          setDeleteOpen(false);
+          setSelectedFounder(null);
+        }}
+      >
+        <View style={{ gap: 16 }}>
+          <Text style={{ color: palette.textMuted }}>
+            Confirm founder removal with your own matricule and password.
+          </Text>
+          <Field
+            label="Your Matricule"
+            value={deleteMatricule}
+            onChangeText={setDeleteMatricule}
+            placeholder="Matricule"
+          />
+          <Field
+            label="Your Password"
+            value={deletePassword}
+            onChangeText={setDeletePassword}
+            placeholder="Password"
+            secureTextEntry
+          />
+          <AppButton
+            label="Remove Founder"
+            variant="danger"
+            onPress={() => deleteFounderMutation.mutate()}
+            loading={deleteFounderMutation.isPending}
+          />
+        </View>
+      </ModalSheet>
     </Screen>
+  );
+}
+
+function FounderForm({
+  form,
+  setForm,
+  submitLabel,
+  onSubmit,
+  loading,
+  disableProtectedFields = false,
+}: {
+  form: FounderFormState;
+  setForm: React.Dispatch<React.SetStateAction<FounderFormState>>;
+  submitLabel: string;
+  onSubmit: () => void;
+  loading: boolean;
+  disableProtectedFields?: boolean;
+}) {
+  const roleOptions = disableProtectedFields
+    ? [{ label: form.role, value: form.role }]
+    : FOUNDER_ROLE_OPTIONS;
+
+  return (
+    <View style={{ gap: 16 }}>
+      <Field
+        label="Full Name"
+        value={form.name}
+        onChangeText={(value) => setForm((current) => ({ ...current, name: value }))}
+        placeholder="Founder name"
+      />
+      <Field
+        label="Founder Title"
+        value={form.founderTitle}
+        onChangeText={(value) => setForm((current) => ({ ...current, founderTitle: value }))}
+        placeholder="Strategic Growth Founder"
+      />
+      <Field
+        label="Email"
+        value={form.email}
+        onChangeText={(value) => setForm((current) => ({ ...current, email: value }))}
+        placeholder="Email address"
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      <Field
+        label="Phone"
+        value={form.phone}
+        onChangeText={(value) => setForm((current) => ({ ...current, phone: value }))}
+        placeholder="Phone number"
+        keyboardType="phone-pad"
+      />
+      <Field
+        label="WhatsApp"
+        value={form.whatsapp}
+        onChangeText={(value) => setForm((current) => ({ ...current, whatsapp: value }))}
+        placeholder="WhatsApp number"
+        keyboardType="phone-pad"
+      />
+      <OptionChips
+        label="System Role"
+        options={roleOptions}
+        value={form.role}
+        onChange={(value) =>
+          !disableProtectedFields &&
+          setForm((current) => ({ ...current, role: value as UserRole }))
+        }
+      />
+      <Field
+        label="Primary Share (%)"
+        value={form.primarySharePercentage}
+        onChangeText={(value) =>
+          !disableProtectedFields &&
+          setForm((current) => ({ ...current, primarySharePercentage: value }))
+        }
+        placeholder="8.50"
+        keyboardType="numeric"
+        editable={!disableProtectedFields}
+      />
+      <OptionChips
+        label="Access Level"
+        options={ACCESS_OPTIONS}
+        value={form.accessLevel}
+        onChange={(value) =>
+          setForm((current) => ({ ...current, accessLevel: value as FounderAccessLevel }))
+        }
+      />
+      <OptionChips
+        label="Renewable Shares"
+        options={[
+          { label: "Yes", value: "yes" },
+          { label: "No", value: "no" },
+        ]}
+        value={form.hasRenewableShares ? "yes" : "no"}
+        onChange={(value) =>
+          setForm((current) => ({ ...current, hasRenewableShares: value === "yes" }))
+        }
+      />
+      {form.hasRenewableShares ? (
+        <Field
+          label="Renewal Period (days)"
+          value={form.shareRenewalPeriodDays}
+          onChangeText={(value) =>
+            setForm((current) => ({ ...current, shareRenewalPeriodDays: value }))
+          }
+          placeholder="365"
+          keyboardType="numeric"
+        />
+      ) : null}
+      <AppButton label={submitLabel} onPress={onSubmit} loading={loading} />
+    </View>
   );
 }
 
@@ -74,33 +720,38 @@ export function SchoolsScreen() {
   });
 
   return (
-    <Screen
-      title="Schools"
-      subtitle="Registered institution nodes and their live distribution across the platform."
-    >
+    <Screen title="Schools" subtitle="Institution registry">
       <View style={{ gap: 12 }}>
-        <StatCard label="Total Schools" value={statsQuery.data?.total_schools ?? 0} helper="All registered school nodes." />
-        <StatCard label="Active Schools" value={statsQuery.data?.active_schools ?? 0} helper="Nodes currently active on the platform." tone="success" />
-        <StatCard label="Total Students" value={statsQuery.data?.total_students ?? 0} helper="Aggregated student population across the network." />
-        <StatCard label="Total Teachers" value={statsQuery.data?.total_teachers ?? 0} helper="Aggregated teaching workforce across the network." />
+        <StatCard label="Total Schools" value={statsQuery.data?.total_schools ?? 0} helper="Registered school nodes." />
+        <StatCard label="Active Schools" value={statsQuery.data?.active_schools ?? 0} helper="Nodes currently active." tone="success" />
+        <StatCard label="Total Students" value={statsQuery.data?.total_students ?? 0} helper="Learners across the network." />
+        <StatCard label="Total Teachers" value={statsQuery.data?.total_teachers ?? 0} helper="Teaching workforce across the network." />
       </View>
 
-      <SectionTitle title="Institution Registry" subtitle="Live school nodes returned by the backend." />
+      <SectionTitle title="Institution Registry" />
       {schoolsQuery.isLoading && !schoolsQuery.data ? (
         <LoadingState label="Loading schools..." />
       ) : (schoolsQuery.data?.results ?? []).length ? (
         <View style={{ gap: 12 }}>
           {(schoolsQuery.data?.results ?? []).map((school) => (
             <Card key={school.id}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <UserAvatar name={school.name} uri={school.logo} size={54} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: "800", color: palette.text, fontSize: 16 }}>
+                    {school.name}
+                  </Text>
+                  <Text style={{ color: palette.textMuted }}>
+                    {school.short_name || school.shortName || "No short name"} •{" "}
+                    {school.location || "Location not set"}
+                  </Text>
+                </View>
+              </View>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                 <Tag label={school.status || "Active"} tone={school.status === "Active" ? "success" : "warning"} />
                 {school.region ? <Tag label={school.region} /> : null}
               </View>
-              <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>{school.name}</Text>
-              <Text style={{ color: "#667085", lineHeight: 19 }}>
-                {school.short_name || school.shortName || "No short name"} • {school.location || "Location not set"}
-              </Text>
-              <Text style={{ color: "#667085", lineHeight: 19 }}>
+              <Text style={{ color: palette.textMuted }}>
                 {school.student_count ?? 0} students • {school.teacher_count ?? 0} teachers
               </Text>
             </Card>
@@ -125,19 +776,16 @@ export function SupportScreen() {
   });
 
   return (
-    <Screen
-      title="Support Registry"
-      subtitle="Support contributions and platform backing records available to executive accounts."
-    >
+    <Screen title="Support Registry" subtitle="Platform backing">
       <View style={{ gap: 12 }}>
-        <StatCard label="Support Revenue" value={formatMoney(statsQuery.data?.total_revenue)} helper="Platform support amount recorded so far." tone="success" />
-        <StatCard label="Active Users" value={statsQuery.data?.active_users ?? 0} helper="Live user participation across the platform." />
-        <StatCard label="New Orders" value={statsQuery.data?.new_orders ?? 0} helper="Fresh onboarding or order requests in the pipeline." />
+        <StatCard label="Support Revenue" value={formatMoney(statsQuery.data?.total_revenue)} helper="Recorded support value." tone="success" />
+        <StatCard label="Active Users" value={statsQuery.data?.active_users ?? 0} helper="Live users on the platform." />
+        <StatCard label="New Orders" value={statsQuery.data?.new_orders ?? 0} helper="Fresh onboarding requests." />
       </View>
 
-      <SectionTitle title="Contribution Ledger" subtitle="Latest support contributions from the backend." />
+      <SectionTitle title="Contribution Ledger" />
       {supportQuery.isLoading && !supportQuery.data ? (
-        <LoadingState label="Loading support contributions..." />
+        <LoadingState label="Loading contributions..." />
       ) : (supportQuery.data?.results ?? []).length ? (
         <View style={{ gap: 12 }}>
           {(supportQuery.data?.results ?? []).map((entry) => (
@@ -146,18 +794,18 @@ export function SupportScreen() {
                 <Tag label={entry.status} tone={entry.status === "Verified" ? "success" : "warning"} />
                 {(entry.payment_method || entry.method) ? <Tag label={entry.payment_method || entry.method || "Method"} /> : null}
               </View>
-              <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>
+              <Text style={{ fontWeight: "800", color: palette.text, fontSize: 16 }}>
                 {entry.user?.name || entry.userName || "Supporter"}
               </Text>
-              <Text style={{ color: "#667085", lineHeight: 19 }}>
+              <Text style={{ color: palette.textMuted }}>
                 {formatMoney(entry.amount)} • {entry.schoolName || entry.school || "Platform contribution"}
               </Text>
-              <Text style={{ color: "#667085", lineHeight: 19 }}>{entry.message}</Text>
+              <Text style={{ color: palette.textMuted }}>{entry.message}</Text>
             </Card>
           ))}
         </View>
       ) : (
-        <EmptyState title="No contributions yet" description="Support contributions will appear here once recorded." />
+        <EmptyState title="No contributions yet" description="Support contributions will appear here." />
       )}
     </Screen>
   );
@@ -180,17 +828,14 @@ export function TestimonialsScreen() {
   );
 
   return (
-    <Screen
-      title="Testimonials"
-      subtitle="Community testimonies and approval status across the live platform."
-    >
+    <Screen title="Testimonials" subtitle="Community testimonies">
       <View style={{ gap: 12 }}>
-        <StatCard label="Total Testimonies" value={testimoniesQuery.data?.count ?? 0} helper="Stories submitted to the community portal." />
-        <StatCard label="Approved" value={approvedCount} helper="Testimonies already visible to the public portal." tone="success" />
-        <StatCard label="Pending Review" value={pendingQuery.data?.count ?? 0} helper="Stories still waiting for executive review." tone="warning" />
+        <StatCard label="Total Testimonies" value={testimoniesQuery.data?.count ?? 0} helper="Stories submitted to the platform." />
+        <StatCard label="Approved" value={approvedCount} helper="Visible to the public portal." tone="success" />
+        <StatCard label="Pending Review" value={pendingQuery.data?.count ?? 0} helper="Waiting for executive review." tone="warning" />
       </View>
 
-      <SectionTitle title="Latest Testimonies" subtitle="Recent stories returned by the backend testimony service." />
+      <SectionTitle title="Latest Testimonies" />
       {testimoniesQuery.isLoading && !testimoniesQuery.data ? (
         <LoadingState label="Loading testimonies..." />
       ) : (testimoniesQuery.data?.results ?? []).length ? (
@@ -201,10 +846,10 @@ export function TestimonialsScreen() {
                 <Tag label={entry.status} tone={entry.status === "approved" ? "success" : "warning"} />
                 {entry.role_display || entry.role ? <Tag label={entry.role_display || entry.role || "Role"} /> : null}
               </View>
-              <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>
+              <Text style={{ fontWeight: "800", color: palette.text, fontSize: 16 }}>
                 {entry.name || entry.author?.name || "Community member"}
               </Text>
-              <Text style={{ color: "#667085", lineHeight: 19 }}>{entry.message}</Text>
+              <Text style={{ color: palette.textMuted }}>{entry.message}</Text>
             </Card>
           ))}
         </View>
@@ -222,9 +867,17 @@ export function PlatformSettingsScreen() {
     queryFn: () => platformService.getPlatformSettings(),
   });
 
+  const statsQuery = useQuery({
+    queryKey: ["platform", "settings", "stats"],
+    queryFn: () => platformService.getPlatformStats(),
+  });
+
   const [name, setName] = useState("");
   const [deadline, setDeadline] = useState("");
-  const [honourRollThreshold, setHonourRollThreshold] = useState("");
+  const [honourRollThreshold, setHonourRollThreshold] = useState("15");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [fees, setFees] = useState<Record<string, string>>({});
 
   React.useEffect(() => {
     if (!settingsQuery.data) {
@@ -234,9 +887,14 @@ export function PlatformSettingsScreen() {
     setDeadline(settingsQuery.data.payment_deadline || settingsQuery.data.paymentDeadline || "");
     setHonourRollThreshold(
       String(
-        settingsQuery.data.honour_roll_threshold ?? settingsQuery.data.honourRollThreshold ?? 15
+        settingsQuery.data.honour_roll_threshold ??
+          settingsQuery.data.honourRollThreshold ??
+          15
       )
     );
+    setContactEmail(settingsQuery.data.contact_email || "");
+    setContactPhone(settingsQuery.data.contact_phone || "");
+    setFees(settingsQuery.data.fees ?? {});
   }, [settingsQuery.data]);
 
   const saveMutation = useMutation({
@@ -245,33 +903,73 @@ export function PlatformSettingsScreen() {
         name: name.trim(),
         payment_deadline: deadline.trim(),
         honour_roll_threshold: Number(honourRollThreshold || 15),
-      }),
+        contact_email: contactEmail.trim(),
+        contact_phone: contactPhone.trim(),
+        fees,
+      } as UpdatePlatformSettingsRequest),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["platform", "settings"] });
-      Alert.alert("Platform settings updated", "The mobile app has saved the current platform settings.");
+      Alert.alert("Platform settings updated", "The platform settings have been saved.");
     },
-    onError: (error) => {
-      Alert.alert("Save failed", getApiErrorMessage(error));
+    onError: (error) => Alert.alert("Save failed", getApiErrorMessage(error)),
+  });
+
+  const uploadLogoMutation = useMutation({
+    mutationFn: async () => {
+      const file = await pickImageUpload({ aspect: [1, 1], quality: 0.9 });
+      if (!file) {
+        return null;
+      }
+      return platformService.uploadLogo(file);
     },
+    onSuccess: async (payload) => {
+      if (!payload) {
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["platform", "settings"] });
+      Alert.alert("Logo updated", "The platform logo has been updated.");
+    },
+    onError: (error) => Alert.alert("Upload failed", getApiErrorMessage(error)),
   });
 
   return (
-    <Screen
-      title="Portfolio & Policy"
-      subtitle="Platform identity, deadlines, and key policy settings pulled from the same backend used on web."
-    >
+    <Screen title="Portfolio & Policy" subtitle="Platform settings">
+      <View style={{ gap: 12 }}>
+        <StatCard label="Active Schools" value={statsQuery.data?.active_schools ?? 0} helper="School nodes currently active." />
+        <StatCard label="Total Users" value={statsQuery.data?.total_users ?? 0} helper="Accounts on the platform." />
+        <StatCard label="Revenue" value={formatMoney(statsQuery.data?.total_revenue)} helper="Confirmed platform revenue." tone="success" />
+      </View>
+
       {settingsQuery.isLoading && !settingsQuery.data ? (
         <LoadingState label="Loading platform settings..." />
       ) : (
         <>
           <Card>
-            {settingsQuery.data?.logo ? (
-              <Image
-                source={{ uri: settingsQuery.data.logo }}
-                resizeMode="contain"
-                style={{ width: 84, height: 84, borderRadius: 22, backgroundColor: "#FFFFFF" }}
-              />
-            ) : null}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+              {settingsQuery.data?.logo ? (
+                <Image
+                  source={{ uri: settingsQuery.data.logo }}
+                  resizeMode="contain"
+                  style={{ width: 78, height: 78, borderRadius: 24, backgroundColor: "#FFFFFF" }}
+                />
+              ) : (
+                <UserAvatar name={name || "EduIgnite"} size={78} />
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontWeight: "900", fontSize: 20, color: palette.text }}>
+                  {name || "EduIgnite"}
+                </Text>
+                <Text style={{ color: palette.textMuted }}>
+                  Platform identity and policy controls.
+                </Text>
+              </View>
+            </View>
+            <AppButton
+              label="Update Logo"
+              variant="secondary"
+              onPress={() => uploadLogoMutation.mutate()}
+              loading={uploadLogoMutation.isPending}
+            />
             <Field label="Platform Name" value={name} onChangeText={setName} placeholder="EduIgnite" />
             <Field
               label="Payment Deadline"
@@ -286,26 +984,44 @@ export function PlatformSettingsScreen() {
               placeholder="15"
               keyboardType="numeric"
             />
+            <Field
+              label="Contact Email"
+              value={contactEmail}
+              onChangeText={setContactEmail}
+              placeholder="support@eduignite.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <Field
+              label="Contact Phone"
+              value={contactPhone}
+              onChangeText={setContactPhone}
+              placeholder="+237..."
+              keyboardType="phone-pad"
+            />
+          </Card>
+
+          <Card>
+            <SectionTitle title="Fee Matrix" />
+            <View style={{ gap: 14 }}>
+              {FEE_ROLE_ORDER.map((role) => (
+                <Field
+                  key={role}
+                  label={formatRole(role)}
+                  value={fees[role] || ""}
+                  onChangeText={(value) =>
+                    setFees((current) => ({ ...current, [role]: value }))
+                  }
+                  placeholder="0"
+                  keyboardType="numeric"
+                />
+              ))}
+            </View>
             <AppButton
               label="Save Platform Settings"
               onPress={() => saveMutation.mutate()}
               loading={saveMutation.isPending}
             />
-          </Card>
-
-          <Card>
-            <SectionTitle title="License Fee Matrix" subtitle="Current role-based platform fee policy." />
-            <View style={{ gap: 10 }}>
-              {Object.entries(settingsQuery.data?.fees ?? {}).map(([role, amount]) => (
-                <View
-                  key={role}
-                  style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}
-                >
-                  <Text style={{ color: "#102032", fontWeight: "800" }}>{formatRole(role)}</Text>
-                  <Text style={{ color: "#667085" }}>{formatMoney(amount)}</Text>
-                </View>
-              ))}
-            </View>
           </Card>
         </>
       )}
