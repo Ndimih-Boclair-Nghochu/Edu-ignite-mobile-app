@@ -20,31 +20,50 @@ const normalizeBlog = (blog: any): CommunityBlog => ({
     : blog?.author,
 });
 
+const normalizeTestimony = (testimony: any): Testimony => ({
+  ...testimony,
+  profileImage: resolveMediaUrl(testimony?.profileImage ?? testimony?.profile_image) ||
+    testimony?.profileImage ||
+    testimony?.profile_image,
+  author: testimony?.author
+    ? {
+        ...testimony.author,
+        avatar: resolveMediaUrl(testimony.author.avatar) || testimony.author.avatar,
+      }
+    : testimony?.author,
+});
+
 export const communityService = {
   async getTestimonies(params?: ListParams): Promise<PaginatedResponse<Testimony>> {
     const { data } = await apiClient.get(API.COMMUNITY.TESTIMONIES, { params });
-    return data;
+    return {
+      ...data,
+      results: (data?.results ?? []).map(normalizeTestimony),
+    };
   },
 
   async getTestimony(id: string): Promise<Testimony> {
     const { data } = await apiClient.get(API.COMMUNITY.TESTIMONY_DETAIL(id));
-    return data;
+    return normalizeTestimony(data);
   },
 
   async getPendingTestimonies(params?: ListParams): Promise<PaginatedResponse<Testimony>> {
     const { data } = await apiClient.get(API.COMMUNITY.PENDING_TESTIMONIES, { params });
-    return data;
+    return {
+      ...data,
+      results: (data?.results ?? []).map(normalizeTestimony),
+    };
   },
 
   async createTestimony(testimonyData: Partial<Testimony>): Promise<Testimony> {
     const { data } = await apiClient.post(API.COMMUNITY.TESTIMONIES, testimonyData);
-    return data;
+    return normalizeTestimony(data);
   },
 
   async approveTestimony(idOrPayload: string | { id: string }): Promise<Testimony> {
     const id = typeof idOrPayload === 'string' ? idOrPayload : idOrPayload.id;
     const { data } = await apiClient.post(API.COMMUNITY.APPROVE_TESTIMONY(id), {});
-    return data;
+    return normalizeTestimony(data);
   },
 
   async rejectTestimony(
@@ -54,7 +73,7 @@ export const communityService = {
     const id = typeof idOrPayload === 'string' ? idOrPayload : idOrPayload.id;
     const payloadReason = typeof idOrPayload === 'string' ? reason : idOrPayload.reason;
     const { data } = await apiClient.post(API.COMMUNITY.REJECT_TESTIMONY(id), { reason: payloadReason });
-    return data;
+    return normalizeTestimony(data);
   },
 
   async getBlogs(params?: ListParams): Promise<PaginatedResponse<CommunityBlog>> {

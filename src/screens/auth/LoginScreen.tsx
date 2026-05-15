@@ -106,6 +106,11 @@ export function LoginScreen({ navigation }: Props) {
               variant="ghost"
               onPress={() => navigation.navigate("ForgotPassword")}
             />
+            <AppButton
+              label="Community Portal"
+              variant="secondary"
+              onPress={() => navigation.navigate("PublicCommunity")}
+            />
             <AppButton label="Back to Landing" variant="ghost" onPress={() => navigation.navigate("Landing")} />
             {message ? <SuccessInline label={message} /> : null}
           </Card>

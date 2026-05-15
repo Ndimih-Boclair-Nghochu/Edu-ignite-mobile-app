@@ -33,6 +33,10 @@ import {
 } from "@/lib/api/types";
 import { pickImageUpload } from "@/lib/uploads";
 import { formatDate, formatMoney, formatRole } from "@/lib/utils/format";
+import {
+  normalizeTutorialLinksRecord,
+  type TutorialLinksRecord,
+} from "@/lib/tutorial-links";
 import { useAuth } from "@/providers/AuthProvider";
 import { palette } from "@/theme";
 
@@ -1290,7 +1294,7 @@ export function PlatformSettingsScreen() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [fees, setFees] = useState<Record<string, string>>({});
-  const [tutorialLinks, setTutorialLinks] = useState<Record<string, string>>({});
+  const [tutorialLinks, setTutorialLinks] = useState<TutorialLinksRecord>({});
   const [portfolioEditorOpen, setPortfolioEditorOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PublicEvent | null>(null);
   const [portfolioForm, setPortfolioForm] = useState<PortfolioFormState>(EMPTY_PORTFOLIO_FORM);
@@ -1312,7 +1316,10 @@ export function PlatformSettingsScreen() {
     setContactPhone(settingsQuery.data.contact_phone || "");
     setFees(settingsQuery.data.fees ?? {});
     setTutorialLinks(
-      settingsQuery.data.tutorial_links ?? settingsQuery.data.tutorialLinks ?? {}
+      normalizeTutorialLinksRecord(
+        settingsQuery.data.tutorial_links ?? settingsQuery.data.tutorialLinks ?? {},
+        TUTORIAL_ROLE_OPTIONS
+      )
     );
   }, [settingsQuery.data]);
 
@@ -1538,17 +1545,43 @@ export function PlatformSettingsScreen() {
             <SectionTitle title="Training Links" />
             <View style={{ gap: 14 }}>
               {TUTORIAL_ROLE_OPTIONS.map((role) => (
-                <Field
-                  key={role}
-                  label={formatRole(role)}
-                  value={tutorialLinks[role] || ""}
-                  onChangeText={(value) =>
-                    setTutorialLinks((current) => ({ ...current, [role]: value }))
-                  }
-                  placeholder="https://..."
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+                <Card key={role} style={{ gap: 12 }}>
+                  <Text style={{ fontWeight: "800", color: palette.text }}>
+                    {formatRole(role)}
+                  </Text>
+                  <Field
+                    label="Web App Tutorial"
+                    value={tutorialLinks[role]?.web || ""}
+                    onChangeText={(value) =>
+                      setTutorialLinks((current) => ({
+                        ...current,
+                        [role]: {
+                          web: value,
+                          mobile: current[role]?.mobile ?? "",
+                        },
+                      }))
+                    }
+                    placeholder="https://..."
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <Field
+                    label="Mobile App Tutorial"
+                    value={tutorialLinks[role]?.mobile || ""}
+                    onChangeText={(value) =>
+                      setTutorialLinks((current) => ({
+                        ...current,
+                        [role]: {
+                          web: current[role]?.web ?? "",
+                          mobile: value,
+                        },
+                      }))
+                    }
+                    placeholder="https://..."
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </Card>
               ))}
             </View>
             <AppButton

@@ -14,6 +14,14 @@ import {
 const isFormDataPayload = (value: unknown): value is FormData =>
   typeof FormData !== 'undefined' && value instanceof FormData;
 
+const normalizePublicEvent = (event: any): PublicEvent => ({
+  ...event,
+  type: String(event?.type || "image").toLowerCase() === "video" ? "video" : "image",
+  url: resolveMediaUrl(event?.url) || event?.url || "",
+  title: event?.title ?? "",
+  description: event?.description ?? "",
+});
+
 export const platformService = {
   async getPlatformSettings(): Promise<PlatformSettings> {
     const { data } = await apiClient.get(API.PLATFORM.SETTINGS);
@@ -66,7 +74,10 @@ export const platformService = {
 
   async getPublicEvents(params?: ListParams): Promise<PaginatedResponse<PublicEvent>> {
     const { data } = await apiClient.get(API.PLATFORM.EVENTS, { params });
-    return data;
+    return {
+      ...data,
+      results: (data?.results ?? []).map(normalizePublicEvent),
+    };
   },
 
   async createEvent(eventData: Partial<PublicEvent> | FormData): Promise<PublicEvent> {
@@ -74,7 +85,7 @@ export const platformService = {
       ? { headers: { 'Content-Type': 'multipart/form-data' } }
       : undefined;
     const { data } = await apiClient.post(API.PLATFORM.EVENTS, eventData, config);
-    return data;
+    return normalizePublicEvent(data);
   },
 
   async createPublicEvent(eventData: Partial<PublicEvent> | FormData): Promise<PublicEvent> {
@@ -86,7 +97,7 @@ export const platformService = {
       ? { headers: { 'Content-Type': 'multipart/form-data' } }
       : undefined;
     const { data } = await apiClient.patch(API.PLATFORM.EVENT_DETAIL(id), eventData, config);
-    return data;
+    return normalizePublicEvent(data);
   },
 
   async updatePublicEvent(id: string, eventData: Partial<PublicEvent> | FormData): Promise<PublicEvent> {

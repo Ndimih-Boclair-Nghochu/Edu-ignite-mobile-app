@@ -329,6 +329,11 @@ export interface PlatformFees {
   [key: string]: string;
 }
 
+export interface TutorialLinkTargets {
+  web: string;
+  mobile: string;
+}
+
 export interface PlatformSettings {
   name: string;
   logo?: string;
@@ -337,8 +342,8 @@ export interface PlatformSettings {
   honour_roll_threshold?: number;
   honourRollThreshold?: number;
   fees: Record<string, string>;
-  tutorial_links?: Record<string, string>;
-  tutorialLinks?: Record<string, string>;
+  tutorial_links?: Record<string, TutorialLinkTargets>;
+  tutorialLinks?: Record<string, TutorialLinkTargets>;
   maintenance_mode?: boolean;
   contact_email?: string;
   contact_phone?: string;

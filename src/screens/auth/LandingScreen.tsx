@@ -57,6 +57,7 @@ export function LandingScreen({ navigation }: Props) {
   const logoOpacity = React.useRef(new Animated.Value(0)).current;
   const firstButton = React.useRef(new Animated.Value(0)).current;
   const secondButton = React.useRef(new Animated.Value(0)).current;
+  const thirdButton = React.useRef(new Animated.Value(0)).current;
   const [nameStart, setNameStart] = React.useState(0);
   const [titleStart, setTitleStart] = React.useState(0);
   const [supportStart, setSupportStart] = React.useState(0);
@@ -78,35 +79,44 @@ export function LandingScreen({ navigation }: Props) {
   React.useEffect(() => {
     firstButton.setValue(0);
     secondButton.setValue(0);
+    thirdButton.setValue(0);
     logoScale.setValue(0.72);
     logoOpacity.setValue(0);
 
     const nameDelay = platformName.length * 52 + 200;
     const titleDelay = nameDelay + landingTitle.length * 28 + 180;
     const supportDelay = titleDelay + landingSubtitle.length * 18 + 180;
+    const secondButtonDelay = supportDelay + 240;
+    const thirdButtonDelay = secondButtonDelay + 240;
 
     const timers = [
       setTimeout(() => setNameStart((current) => current + 1), 420),
       setTimeout(() => setTitleStart((current) => current + 1), nameDelay),
       setTimeout(() => setSupportStart((current) => current + 1), titleDelay),
       setTimeout(() => {
-        Animated.sequence([
-          Animated.parallel([
-            Animated.timing(firstButton, {
-              toValue: 1,
-              duration: 260,
-              easing: Easing.out(Easing.cubic),
-              useNativeDriver: true,
-            }),
-          ]),
-          Animated.timing(secondButton, {
-            toValue: 1,
-            duration: 260,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]).start();
+        Animated.timing(firstButton, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
       }, supportDelay),
+      setTimeout(() => {
+        Animated.timing(secondButton, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      }, secondButtonDelay),
+      setTimeout(() => {
+        Animated.timing(thirdButton, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      }, thirdButtonDelay),
     ];
 
     Animated.parallel([
@@ -127,7 +137,7 @@ export function LandingScreen({ navigation }: Props) {
     return () => {
       timers.forEach((timer) => clearTimeout(timer));
     };
-  }, [firstButton, landingSubtitle, landingTitle, logoOpacity, logoScale, platformName, secondButton]);
+  }, [firstButton, landingSubtitle, landingTitle, logoOpacity, logoScale, platformName, secondButton, thirdButton]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -213,6 +223,25 @@ export function LandingScreen({ navigation }: Props) {
               label={t("activateAccount")}
               variant="ghost"
               onPress={() => navigation.navigate("Activate")}
+            />
+          </Animated.View>
+          <Animated.View
+            style={{
+              opacity: thirdButton,
+              transform: [
+                {
+                  translateY: thirdButton.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [16, 0],
+                  }),
+                },
+              ],
+            }}
+          >
+            <AppButton
+              label="Community Portal"
+              variant="secondary"
+              onPress={() => navigation.navigate("PublicCommunity")}
             />
           </Animated.View>
         </View>

@@ -18,7 +18,12 @@ import { ActivateAccountScreen } from "@/screens/auth/ActivateAccountScreen";
 import { ForgotPasswordScreen } from "@/screens/auth/ForgotPasswordScreen";
 import { LandingScreen } from "@/screens/auth/LandingScreen";
 import { LoginScreen } from "@/screens/auth/LoginScreen";
+import { PublicCommunityScreen } from "@/screens/auth/PublicCommunityScreen";
+import { PublicHighlightsScreen } from "@/screens/auth/PublicHighlightsScreen";
+import { PublicLogDetailScreen } from "@/screens/auth/PublicLogDetailScreen";
+import { PublicLogsScreen } from "@/screens/auth/PublicLogsScreen";
 import { AnnouncementsScreen } from "@/screens/modules/AnnouncementsScreen";
+import { AIFeedbackScreen } from "@/screens/modules/AIFeedbackScreen";
 import { AIScreen } from "@/screens/modules/AIScreen";
 import { AssignmentsScreen } from "@/screens/modules/AssignmentsScreen";
 import { AttendanceScreen } from "@/screens/modules/AttendanceScreen";
@@ -27,6 +32,7 @@ import { ExamsScreen } from "@/screens/modules/ExamsScreen";
 import { FeesScreen } from "@/screens/modules/FeesScreen";
 import { LibraryScreen } from "@/screens/modules/LibraryScreen";
 import { LiveClassesScreen } from "@/screens/modules/LiveClassesScreen";
+import { LogPostScreen } from "@/screens/modules/LogPostScreen";
 import {
   ChildrenScreen,
   FeedbackScreen,
@@ -160,6 +166,26 @@ export function Navigation() {
             <Stack.Screen name="Landing" component={LandingScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen
+              name="PublicCommunity"
+              component={PublicCommunityScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="PublicHighlights"
+              component={PublicHighlightsScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="PublicLogs"
+              component={PublicLogsScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="PublicLogDetail"
+              component={PublicLogDetailScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="Activate"
               component={ActivateAccountScreen}
               options={{ title: t("activateAccount", "Activate Account") }}
@@ -238,6 +264,16 @@ export function Navigation() {
               name="AI"
               component={AIScreen}
               options={{ title: "AI Assistant" }}
+            />
+            <Stack.Screen
+              name="LogPost"
+              component={LogPostScreen}
+              options={{ title: "Log Post" }}
+            />
+            <Stack.Screen
+              name="AIFeedback"
+              component={AIFeedbackScreen}
+              options={{ title: "AI Feedback" }}
             />
             <Stack.Screen
               name="Schedule"

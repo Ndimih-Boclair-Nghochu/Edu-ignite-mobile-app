@@ -20,6 +20,7 @@ import {
   MessagesSquare,
   MessageCircleWarning,
   NotebookPen,
+  PenTool,
   Quote,
   ScrollText,
   Settings2,
@@ -63,7 +64,9 @@ export type ModuleRoute =
   | "LiveClasses"
   | "Community"
   | "AI"
-  | "Schedule";
+  | "Schedule"
+  | "LogPost"
+  | "AIFeedback";
 
 export type AppModule = {
   key: ModuleRoute;
@@ -76,6 +79,15 @@ export type AppModule = {
 };
 
 export const APP_MODULES: AppModule[] = [
+  {
+    key: "LogPost",
+    title: "Log Post",
+    description: "Publish strategic platform updates to the community portal.",
+    route: "LogPost",
+    icon: PenTool,
+    roles: EXECUTIVE_ROLES,
+    group: "engagement",
+  },
   {
     key: "Founders",
     title: "Founders",
@@ -309,6 +321,15 @@ export const APP_MODULES: AppModule[] = [
     icon: ScrollText,
     roles: ["TEACHER"],
     group: "academics",
+  },
+  {
+    key: "AIFeedback",
+    title: "AI Feedback",
+    description: "Generate polished student feedback from classroom performance notes.",
+    route: "AIFeedback",
+    icon: Sparkles,
+    roles: ["TEACHER"],
+    group: "engagement",
   },
   {
     key: "Community",

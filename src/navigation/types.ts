@@ -1,6 +1,13 @@
 export type RootStackParamList = {
   Landing: undefined;
   Login: undefined;
+  PublicCommunity: undefined;
+  PublicHighlights: undefined;
+  PublicLogs: undefined;
+  PublicLogDetail: {
+    blogId: string;
+    title?: string;
+  };
   Activate: undefined;
   ForgotPassword: undefined;
   Tabs: undefined;
@@ -32,6 +39,8 @@ export type RootStackParamList = {
   Community: undefined;
   AI: undefined;
   Schedule: undefined;
+  LogPost: undefined;
+  AIFeedback: undefined;
   Conversation: {
     conversationId: string;
     title?: string;

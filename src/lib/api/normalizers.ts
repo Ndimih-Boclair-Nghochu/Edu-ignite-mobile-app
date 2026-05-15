@@ -9,6 +9,7 @@ import type {
   User,
 } from "./types";
 import { resolveMediaUrl } from "@/lib/media";
+import { normalizeTutorialLinksRecord } from "@/lib/tutorial-links";
 
 export function normalizeSchool(school: Record<string, any> | undefined | null): School | undefined {
   if (!school) return undefined;
@@ -119,8 +120,12 @@ export function normalizePlatformSettings(
     honourRollThreshold:
       settings?.honourRollThreshold ?? settings?.honour_roll_threshold ?? 15,
     fees: settings?.fees ?? {},
-    tutorial_links: settings?.tutorial_links ?? settings?.tutorialLinks ?? {},
-    tutorialLinks: settings?.tutorialLinks ?? settings?.tutorial_links ?? {},
+    tutorial_links: normalizeTutorialLinksRecord(
+      settings?.tutorial_links ?? settings?.tutorialLinks ?? {}
+    ),
+    tutorialLinks: normalizeTutorialLinksRecord(
+      settings?.tutorialLinks ?? settings?.tutorial_links ?? {}
+    ),
   };
 }
 
