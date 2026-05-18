@@ -17,7 +17,9 @@ export type SyncActionType =
   | "BULK_RECORD_ATTENDANCE"
   | "CREATE_LIBRARY_REQUEST"
   | "CREATE_SUB_SCHOOL"
-  | "CREATE_HIERARCHY_CLASS";
+  | "ASSIGN_SUB_ADMIN"
+  | "CREATE_HIERARCHY_CLASS"
+  | "CREATE_HIERARCHY_SUBJECT";
 
 export type SyncActionPayloadMap = {
   CREATE_STUDENT: CreateStudentRequest;
@@ -41,11 +43,28 @@ export type SyncActionPayloadMap = {
   CREATE_SUB_SCHOOL: {
     name: string;
     vice_principal?: string | null;
+    school_id?: string;
+  };
+  ASSIGN_SUB_ADMIN: {
+    staff: string;
+    sub_school: string;
+    school_id?: string;
   };
   CREATE_HIERARCHY_CLASS: {
     name: string;
     sub_school?: string | null;
     class_master?: string | null;
+    school_id?: string;
+  };
+  CREATE_HIERARCHY_SUBJECT: {
+    school_class: string;
+    subject?: string | null;
+    subject_name?: string;
+    subject_code?: string;
+    teacher?: string | null;
+    type: "mandatory" | "optional";
+    coefficient: number;
+    school_id?: string;
   };
 };
 
@@ -89,6 +108,14 @@ export type SyncAction =
       payload: SyncActionPayloadMap["CREATE_SUB_SCHOOL"];
     })
   | (SyncActionBase & {
+      type: "ASSIGN_SUB_ADMIN";
+      payload: SyncActionPayloadMap["ASSIGN_SUB_ADMIN"];
+    })
+  | (SyncActionBase & {
       type: "CREATE_HIERARCHY_CLASS";
       payload: SyncActionPayloadMap["CREATE_HIERARCHY_CLASS"];
+    })
+  | (SyncActionBase & {
+      type: "CREATE_HIERARCHY_SUBJECT";
+      payload: SyncActionPayloadMap["CREATE_HIERARCHY_SUBJECT"];
     });

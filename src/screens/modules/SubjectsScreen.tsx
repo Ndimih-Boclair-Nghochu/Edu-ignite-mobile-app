@@ -105,7 +105,7 @@ export function SubjectsScreen() {
       }
 
       const catalogRows = subjectsQuery.data?.results ?? [];
-      let subjectId = selectedCatalogSubjectId;
+      let subjectId = selectedCatalogSubjectId === null ? null : selectedCatalogSubjectId;
       let subjectName =
         catalogRows.find((entry) => entry.id === selectedCatalogSubjectId)?.name ??
         customSubjectName.trim();
@@ -123,23 +123,16 @@ export function SubjectsScreen() {
             throw new Error("Choose an existing subject or enter a subject name.");
           }
 
-          const createdSubject = await gradesService.createSubject({
-            name: customSubjectName.trim(),
-            code: buildSubjectCode(customSubjectName.trim()),
-            level: selectedClass.name,
-            coefficient: Number(coefficient || 0) || 1,
-            teacher: selectedTeacherId ?? undefined,
-          });
-          subjectId = createdSubject.id;
-          subjectName = createdSubject.name;
+          subjectName = customSubjectName.trim();
         }
       }
 
       return schoolsService.createHierarchySubject({
         school_class: selectedClass.id,
         class_name: selectedClass.name,
-        subject: subjectId,
+        subject: subjectId ?? null,
         subject_name: subjectName,
+        subject_code: subjectId ? undefined : buildSubjectCode(subjectName),
         teacher: selectedTeacherId ?? undefined,
         type: subjectType,
         coefficient: Number(coefficient || 0) || 1,

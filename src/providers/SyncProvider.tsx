@@ -120,9 +120,18 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         await schoolsService.createSubSchool(action.payload);
         queryClient.invalidateQueries({ queryKey: ["schools", "hierarchy"] });
         break;
+      case "ASSIGN_SUB_ADMIN":
+        await schoolsService.assignSubAdmin(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["schools", "hierarchy"] });
+        break;
       case "CREATE_HIERARCHY_CLASS":
         await schoolsService.createHierarchyClass(action.payload);
         queryClient.invalidateQueries({ queryKey: ["schools", "hierarchy"] });
+        break;
+      case "CREATE_HIERARCHY_SUBJECT":
+        await schoolsService.createHierarchySubject(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["schools", "hierarchy"] });
+        queryClient.invalidateQueries({ queryKey: ["grades", "subjects"] });
         break;
       default:
         break;
