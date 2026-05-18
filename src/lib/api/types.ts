@@ -679,7 +679,9 @@ export interface AttendanceRecord {
   id: string;
   session: string;
   student: Student;
-  status: "Present" | "Absent" | "Late" | "Excused" | string;
+  student_name?: string;
+  student_admission?: string;
+  status: "Present" | "Absent" | "Late" | "Excused" | "present" | "absent" | "late" | "excused" | string;
   excuse_note?: string;
   notified_parent?: boolean;
   session_date?: string;

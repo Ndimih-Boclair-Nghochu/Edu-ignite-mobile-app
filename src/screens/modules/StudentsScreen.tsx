@@ -19,8 +19,9 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { studentsService } from "@/lib/api/services/students.service";
 import { usersService } from "@/lib/api/services/users.service";
-import { CreateStudentRequest, User } from "@/lib/api/types";
+import { CreateStudentRequest } from "@/lib/api/types";
 import { queryKeys } from "@/lib/queryKeys";
+import { buildSchoolStudentRoster } from "@/lib/school-student-roster";
 import { formatDate } from "@/lib/utils/format";
 import { useAuth } from "@/providers/AuthProvider";
 import { useSync } from "@/providers/SyncProvider";
@@ -37,22 +38,10 @@ type StudentFormState = {
   gender: "male" | "female" | "other";
   guardian_name: string;
   guardian_phone: string;
+  student_class: string;
   parent_name: string;
   parent_email: string;
   parent_phone: string;
-};
-
-type RegistryStudentCard = {
-  key: string;
-  id: string;
-  user: User;
-  admissionNumber: string;
-  studentClass: string;
-  guardianName: string;
-  admissionDate?: string;
-  parentCount: number;
-  isOnHonourRoll: boolean;
-  hasProfile: boolean;
 };
 
 const defaultForm: StudentFormState = {
@@ -61,6 +50,7 @@ const defaultForm: StudentFormState = {
   gender: "male",
   guardian_name: "",
   guardian_phone: "",
+  student_class: "",
   parent_name: "",
   parent_email: "",
   parent_phone: "",
@@ -158,47 +148,10 @@ export function StudentsScreen() {
     [classesQuery.data, selectedClassId]
   );
 
-  const registryCards = useMemo<RegistryStudentCard[]>(() => {
-    const profileByUserId = new Map(
-      (studentsQuery.data?.results ?? [])
-        .filter((entry) => entry.user?.id)
-        .map((entry) => [entry.user.id, entry] as const)
-    );
-
-    const rows: RegistryStudentCard[] = (studentsQuery.data?.results ?? []).map((student) => ({
-      key: student.id,
-      id: student.id,
-      user: student.user,
-      admissionNumber: student.admission_number,
-      studentClass: student.school_class_name || student.student_class || "Class pending",
-      guardianName: student.guardian_name || "Guardian pending",
-      admissionDate: student.admission_date,
-      parentCount: student.parent_count ?? 0,
-      isOnHonourRoll: Boolean(student.is_on_honour_roll),
-      hasProfile: true,
-    }));
-
-    for (const entry of studentUsersQuery.data?.results ?? []) {
-      if (profileByUserId.has(entry.id)) {
-        continue;
-      }
-
-      rows.push({
-        key: `user-${entry.id}`,
-        id: entry.id,
-        user: entry,
-        admissionNumber: entry.matricule || "Profile pending",
-        studentClass: entry.student_class || "Class pending",
-        guardianName: "Guardian pending",
-        admissionDate: entry.date_joined,
-        parentCount: 0,
-        isOnHonourRoll: false,
-        hasProfile: false,
-      });
-    }
-
-    return rows;
-  }, [studentUsersQuery.data?.results, studentsQuery.data?.results]);
+  const registryCards = useMemo(
+    () => buildSchoolStudentRoster(studentsQuery.data?.results ?? [], studentUsersQuery.data?.results ?? []),
+    [studentUsersQuery.data?.results, studentsQuery.data?.results]
+  );
 
   const filteredStudents = useMemo(() => {
     const keyword = deferredSearch.trim().toLowerCase();
@@ -238,17 +191,27 @@ export function StudentsScreen() {
   );
 
   async function handleCreateStudent() {
-    if (!form.name.trim() || !form.guardian_name.trim() || !form.guardian_phone.trim()) {
-      Alert.alert("Missing details", "Student name, guardian name, and guardian phone are required.");
+    const className = selectedClass?.name ?? form.student_class.trim();
+
+    if (!form.name.trim() || !className.trim()) {
+      Alert.alert("Missing details", "Student name and class are required.");
       return;
     }
 
     const payload: CreateStudentRequest = {
-      ...form,
+      name: form.name.trim(),
+      email: form.email.trim() || undefined,
+      gender: form.gender,
       school_class: selectedClass?.id ?? null,
-      student_class: selectedClass?.name ?? "Unassigned",
-      class_level: selectedClass?.name ?? "General",
-      section: selectedClass?.sub_school_name ?? schoolQuery.data?.short_name ?? "",
+      student_class: className.trim(),
+      class_level: className.trim(),
+      section: selectedClass?.sub_school_name ?? schoolQuery.data?.short_name ?? "General",
+      guardian_name: form.guardian_name.trim(),
+      guardian_phone: form.guardian_phone.trim(),
+      parent_name: form.parent_name.trim(),
+      parent_email: form.parent_email.trim(),
+      parent_phone: form.parent_phone.trim(),
+      parent_relationship: "guardian",
       create_parent_account: Boolean(
         form.parent_name.trim() && (form.parent_email.trim() || form.parent_phone.trim())
       ),
@@ -384,12 +347,24 @@ export function StudentsScreen() {
           <OptionChips
             label="Class"
             options={(classesQuery.data ?? []).map((item) => ({
-              label: item.name,
+              label: item.sub_school_name ? `${item.name} - ${item.sub_school_name}` : item.name,
               value: item.id,
             }))}
             value={selectedClassId}
-            onChange={setSelectedClassId}
+            onChange={(value) => {
+              setSelectedClassId(value);
+              const nextClass = (classesQuery.data ?? []).find((item) => item.id === value);
+              setForm((current) => ({ ...current, student_class: nextClass?.name ?? current.student_class }));
+            }}
           />
+          {!selectedClass ? (
+            <Field
+              label="Class Name"
+              value={form.student_class}
+              onChangeText={(value) => setForm((current) => ({ ...current, student_class: value }))}
+              placeholder="e.g. Form 4 Science"
+            />
+          ) : null}
           <Field
             label="Guardian Name"
             value={form.guardian_name}

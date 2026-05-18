@@ -10,6 +10,10 @@ export function getApiErrorMessage(error: any, fallback = "Something went wrong.
 
   if (typeof data === "string") {
     const trimmed = data.trim();
+    if (/<!doctype html|<html|<body|<\/?[a-z][\s\S]*>/i.test(trimmed)) {
+      if (status >= 500) return "Server error: the backend failed while processing this request.";
+      return fallback;
+    }
     if (/invalid credentials/i.test(trimmed)) {
       return "Wrong password or matricule does not exist. Check both fields and try again.";
     }

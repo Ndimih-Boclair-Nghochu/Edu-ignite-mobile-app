@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useMemo, useState } from "react";
-import { Alert, Linking, Text, View } from "react-native";
+import React, { useDeferredValue, useMemo, useState } from "react";
+import { Alert, Image, Linking, Text, View } from "react-native";
 import {
   AppButton,
   Card,
   EmptyState,
   Field,
   LoadingState,
+  OptionChips,
   Screen,
   SectionTitle,
   StatCard,
@@ -26,7 +27,13 @@ import { platformService } from "@/lib/api/services/platform.service";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { staffRemarksService } from "@/lib/api/services/staff-remarks.service";
 import { studentsService } from "@/lib/api/services/students.service";
+import { usersService } from "@/lib/api/services/users.service";
 import { pickImageUpload } from "@/lib/uploads";
+import {
+  buildSchoolStudentRoster,
+  SchoolStudentRosterRow,
+  studentRosterMatchesClass,
+} from "@/lib/school-student-roster";
 import { formatDate, formatDateTime, formatMoney, formatRole } from "@/lib/utils/format";
 import { useAuth } from "@/providers/AuthProvider";
 import { palette } from "@/theme";
@@ -587,67 +594,222 @@ export function InsightsScreen() {
 }
 
 export function IDCardsScreen() {
-  const [preview, setPreview] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+  const [selectedClassId, setSelectedClassId] = useState("all");
+  const [previewRow, setPreviewRow] = useState<SchoolStudentRosterRow | null>(null);
+  const [previewPayload, setPreviewPayload] = useState<any | null>(null);
+
+  const schoolQuery = useQuery({
+    queryKey: ["schools", "me", "id-cards"],
+    queryFn: () => schoolsService.getMySchool(),
+    enabled: Boolean(user),
+  });
+
+  const schoolId = schoolQuery.data?.id || user?.school?.id || "";
 
   const studentsQuery = useQuery({
-    queryKey: ["students", "id-cards"],
-    queryFn: () => studentsService.getStudents({ page_size: 40 }),
+    queryKey: ["students", "id-cards", "profiles"],
+    queryFn: () => studentsService.getStudents({ page_size: 500, ordering: "user__name" }),
+    enabled: Boolean(user),
+  });
+
+  const studentUsersQuery = useQuery({
+    queryKey: ["users", "school", schoolId, "id-card-students"],
+    queryFn: () =>
+      usersService.getUsersBySchool(schoolId, {
+        role: "STUDENT",
+        ordering: "name",
+        page_size: 500,
+      }),
+    enabled: Boolean(schoolId),
+  });
+
+  const classesQuery = useQuery({
+    queryKey: ["schools", "classes", "id-cards", schoolId],
+    queryFn: () => schoolsService.getHierarchyClasses({ school_id: schoolId || undefined }),
+    enabled: Boolean(user),
+  });
+
+  const platformSettingsQuery = useQuery({
+    queryKey: ["platform", "settings", "id-cards"],
+    queryFn: () => platformService.getPlatformSettings(),
   });
 
   const cardMutation = useMutation({
-    mutationFn: (studentId: string) => studentsService.getStudentCard(studentId),
-    onSuccess: async (payload) => {
-      if (openPayloadIfPossible(payload)) {
-        return;
-      }
-
-      const summary =
-        typeof payload === "string"
-          ? payload.slice(0, 240)
-          : Object.entries(payload ?? {})
-              .slice(0, 6)
-              .map(([key, value]) => `${key}: ${String(value)}`)
-              .join("\n");
-      setPreview(summary || "Card payload received from backend.");
+    mutationFn: (row: SchoolStudentRosterRow) =>
+      row.profileId ? studentsService.getStudentCard(row.profileId) : Promise.resolve(null),
+    onSuccess: async (payload, row) => {
+      setPreviewRow(row);
+      setPreviewPayload(payload);
+      openPayloadIfPossible(payload);
     },
     onError: (error) => Alert.alert("Could not load card", getApiErrorMessage(error)),
   });
 
+  const roster = useMemo(
+    () => buildSchoolStudentRoster(studentsQuery.data?.results ?? [], studentUsersQuery.data?.results ?? []),
+    [studentUsersQuery.data?.results, studentsQuery.data?.results]
+  );
+
+  const selectedClass = useMemo(
+    () => (classesQuery.data ?? []).find((entry) => entry.id === selectedClassId) ?? null,
+    [classesQuery.data, selectedClassId]
+  );
+
+  const filteredStudents = useMemo(() => {
+    const keyword = deferredSearch.trim().toLowerCase();
+    return roster.filter((row) => {
+      const classMatch =
+        selectedClassId === "all" ||
+        studentRosterMatchesClass(row, selectedClassId, selectedClass?.name);
+      const searchMatch =
+        !keyword ||
+        `${row.name} ${row.matricule} ${row.admissionNumber} ${row.studentClass}`
+          .toLowerCase()
+          .includes(keyword);
+      return classMatch && searchMatch;
+    });
+  }, [deferredSearch, roster, selectedClass?.name, selectedClassId]);
+
+  const readyCards = roster.filter((row) => row.hasProfile).length;
+  const pendingProfiles = Math.max(roster.length - readyCards, 0);
+
   return (
     <Screen
       title="ID Cards"
-      subtitle="Student identity card access from the backend student-card generator."
+      subtitle="Student identity cards from the live school registry."
     >
-      {preview ? (
+      <View style={{ gap: 12 }}>
+        <StatCard label="Students" value={roster.length} helper="Student accounts and profiles visible to this school." />
+        <StatCard label="Ready Cards" value={readyCards} helper="Learners with complete student profiles." tone="success" />
+        <StatCard label="Profile Pending" value={pendingProfiles} helper="Student accounts still missing full admission profiles." tone="warning" />
+      </View>
+
+      <Card>
+        <SectionTitle title="Filters" subtitle="Search or narrow card generation by class." />
+        <Field
+          label="Search Student"
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by name, matricule, class, or admission number"
+        />
+        <OptionChips
+          label="Class"
+          options={[
+            { label: "All classes", value: "all" },
+            ...(classesQuery.data ?? []).map((entry) => ({
+              label: entry.sub_school_name ? `${entry.name} - ${entry.sub_school_name}` : entry.name,
+              value: entry.id,
+            })),
+          ]}
+          value={selectedClassId}
+          onChange={setSelectedClassId}
+        />
+      </Card>
+
+      {previewRow ? (
         <Card>
-          <SectionTitle title="Latest Card Payload" subtitle="Most recent data returned by the backend card generator." />
-          <Text style={{ color: "#667085", lineHeight: 20 }}>{preview}</Text>
+          <SectionTitle title="ID Card Preview" subtitle={previewRow.hasProfile ? "Official student profile" : "Student profile pending"} />
+          <View
+            style={{
+              borderRadius: 22,
+              overflow: "hidden",
+              borderWidth: 1,
+              borderColor: "rgba(38,77,115,0.16)",
+              backgroundColor: "#FFFFFF",
+            }}
+          >
+            <View style={{ backgroundColor: palette.primary, padding: 14, gap: 4 }}>
+              <Text style={{ color: "#FFFFFF", fontWeight: "900", fontSize: 12, textTransform: "uppercase" }}>
+                Student ID Card
+              </Text>
+              <Text style={{ color: "rgba(255,255,255,0.82)", fontWeight: "700" }}>
+                {schoolQuery.data?.name || user?.school?.name || "School"}
+              </Text>
+            </View>
+            <View style={{ padding: 16, gap: 14 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                <UserAvatar name={previewRow.name} uri={previewRow.avatar} size={72} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: "900", color: palette.text, fontSize: 18 }}>
+                    {previewRow.name}
+                  </Text>
+                  <Text style={{ color: palette.textMuted, lineHeight: 20 }}>
+                    {previewRow.matricule || "Matricule pending"}
+                  </Text>
+                  <Text style={{ color: palette.textMuted, lineHeight: 20 }}>
+                    {previewRow.studentClass}
+                  </Text>
+                </View>
+                {schoolQuery.data?.logo || user?.school?.logo ? (
+                  <UserAvatar
+                    name={schoolQuery.data?.name || user?.school?.name}
+                    uri={schoolQuery.data?.logo || user?.school?.logo}
+                    size={52}
+                  />
+                ) : null}
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                {previewPayload?.qr_code ? (
+                  <Image
+                    source={{ uri: previewPayload.qr_code }}
+                    style={{ width: 82, height: 82, borderRadius: 10, backgroundColor: "#FFFFFF" }}
+                    resizeMode="contain"
+                  />
+                ) : null}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: palette.textMuted, lineHeight: 20 }}>
+                    Admission: {previewRow.admissionNumber}
+                  </Text>
+                  <Text style={{ color: palette.textMuted, lineHeight: 20 }}>
+                    Guardian: {previewRow.guardianName || "Pending"}
+                  </Text>
+                  <Text style={{ color: palette.textMuted, lineHeight: 20 }}>
+                    Powered by {platformSettingsQuery.data?.name || "EduIgnite"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+          <AppButton compact label="Close Preview" variant="ghost" onPress={() => setPreviewRow(null)} />
         </Card>
       ) : null}
 
-      {studentsQuery.isLoading && !studentsQuery.data ? (
+      {studentsQuery.isLoading && studentUsersQuery.isLoading && !roster.length ? (
         <LoadingState label="Loading students..." />
-      ) : (studentsQuery.data?.results ?? []).length ? (
+      ) : filteredStudents.length ? (
         <View style={{ gap: 12 }}>
-          {(studentsQuery.data?.results ?? []).map((student) => (
-            <Card key={student.id}>
-              <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>
-                {student.user?.name || "Student"}
-              </Text>
-              <Text style={{ color: "#667085", lineHeight: 19 }}>
-                {student.student_class} • {student.admission_number}
-              </Text>
+          {filteredStudents.map((student) => (
+            <Card key={student.key}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <UserAvatar name={student.name} uri={student.avatar} size={48} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>
+                    {student.name}
+                  </Text>
+                  <Text style={{ color: "#667085", lineHeight: 19 }}>
+                    {student.studentClass} - {student.admissionNumber}
+                  </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+                    <Tag label={student.hasProfile ? "Ready" : "Profile Pending"} tone={student.hasProfile ? "success" : "warning"} />
+                    {student.matricule ? <Tag label={student.matricule} /> : null}
+                  </View>
+                </View>
+              </View>
               <AppButton
-                label="Open Student Card"
+                label="Preview ID Card"
                 variant="secondary"
-                onPress={() => cardMutation.mutate(student.id)}
+                onPress={() => cardMutation.mutate(student)}
                 loading={cardMutation.isPending}
               />
             </Card>
           ))}
         </View>
       ) : (
-        <EmptyState title="No students found" description="Student card generation needs registered learners." />
+        <EmptyState title="No students found" description="No learner matches the current ID-card filters." />
       )}
     </Screen>
   );

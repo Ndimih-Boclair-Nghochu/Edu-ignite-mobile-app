@@ -11,6 +11,7 @@ import {
   OptionChips,
   Screen,
   SectionTitle,
+  StatCard,
   Tag,
 } from "@/components/ui";
 import { getApiErrorMessage } from "@/lib/api/errors";
@@ -24,16 +25,18 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useSync } from "@/providers/SyncProvider";
 
 const attendanceStatuses = [
-  { label: "Present", value: "Present" },
-  { label: "Absent", value: "Absent" },
-  { label: "Late", value: "Late" },
-  { label: "Excused", value: "Excused" },
+  { label: "Present", value: "present" },
+  { label: "Absent", value: "absent" },
+  { label: "Late", value: "late" },
+  { label: "Excused", value: "excused" },
 ];
 
 export function AttendanceScreen() {
   const { user } = useAuth();
   const { enqueue, isOnline } = useSync();
   const isManager = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"].includes(user?.role ?? "");
+  const isTeacher = user?.role === "TEACHER";
+  const isSchoolAdmin = ["SCHOOL_ADMIN", "SUB_ADMIN"].includes(user?.role ?? "");
 
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
@@ -62,6 +65,12 @@ export function AttendanceScreen() {
   const sessionsQuery = useQuery({
     queryKey: queryKeys.attendance.sessions({ limit: 50 }),
     queryFn: () => attendanceService.getAttendanceSessions({ limit: 50 }),
+    enabled: isManager,
+  });
+
+  const recordsQuery = useQuery({
+    queryKey: queryKeys.attendance.records({ limit: 200 }),
+    queryFn: () => attendanceService.getAttendanceRecords({ limit: 200 }),
     enabled: isManager,
   });
 
@@ -112,9 +121,12 @@ export function AttendanceScreen() {
   const classStudents = useMemo(() => {
     return (studentsQuery.data?.results ?? []).filter(
       (student) =>
-        student.school_class_id === selectedClassId || student.school_class === selectedClassId
+        student.school_class_id === selectedClassId ||
+        student.school_class === selectedClassId ||
+        student.school_class_name === selectedClass?.name ||
+        student.student_class === selectedClass?.name
     );
-  }, [selectedClassId, studentsQuery.data?.results]);
+  }, [selectedClass?.name, selectedClassId, studentsQuery.data?.results]);
 
   const subjectOptions = useMemo(() => {
     return (subjectsQuery.data?.results ?? []).map((subject) => ({
@@ -136,7 +148,7 @@ export function AttendanceScreen() {
 
     const records = classStudents.map((student) => ({
       student: student.id,
-      status: (statusMap[student.id] ?? "Present") as "Present" | "Absent" | "Late" | "Excused",
+      status: (statusMap[student.id] ?? "present") as any,
     }));
 
     const payload = {
@@ -194,6 +206,84 @@ export function AttendanceScreen() {
             title="No attendance records"
             description="No attendance entries are cached for this account yet."
           />
+        )}
+      </Screen>
+    );
+  }
+
+  if (isSchoolAdmin) {
+    const records = recordsQuery.data?.results ?? [];
+    const presentRecords = records.filter((record) =>
+      ["present", "late", "Present", "Late"].includes(record.status)
+    ).length;
+    const attendanceHealth = records.length ? Math.round((presentRecords / records.length) * 100) : 0;
+    const absentToday = records.filter((record) =>
+      ["absent", "Absent"].includes(record.status) && record.session_date === new Date().toISOString().slice(0, 10)
+    ).length;
+
+    return (
+      <Screen
+        title="Attendance"
+        subtitle="School-wide attendance records and recent roll-call sessions."
+      >
+        <HeroCard
+          eyebrow="Attendance Governance"
+          title="School Attendance Monitor"
+          description="Review recorded sessions, attendance health, and learner attendance records from the live backend."
+        />
+
+        <View style={{ gap: 12 }}>
+          <StatCard label="Sessions" value={sessionsQuery.data?.count ?? sessionsQuery.data?.results?.length ?? 0} helper="Attendance sessions recorded by teaching staff." />
+          <StatCard label="Records" value={recordsQuery.data?.count ?? records.length} helper="Learner attendance entries visible to this school." />
+          <StatCard label="Attendance Health" value={`${attendanceHealth}%`} helper="Present and late records across loaded attendance." tone="success" />
+          <StatCard label="Absent Today" value={absentToday} helper="Absence records dated today." tone="warning" />
+        </View>
+
+        <SectionTitle title="Recent Sessions" subtitle="Latest class attendance sessions." />
+        {sessionsQuery.isLoading && !sessionsQuery.data ? (
+          <LoadingState label="Loading recent sessions..." />
+        ) : (sessionsQuery.data?.results ?? []).length ? (
+          <View style={{ gap: 12 }}>
+            {(sessionsQuery.data?.results ?? []).slice(0, 10).map((session) => (
+              <Card key={session.id}>
+                <Text style={{ fontWeight: "800", color: "#102032" }}>
+                  {session.school_class_name || session.student_class || "Class session"}
+                </Text>
+                <Text style={{ color: "#667085" }}>
+                  {formatDate(session.date)} - {session.period || "Period not set"}
+                </Text>
+                <Text style={{ color: "#667085" }}>
+                  {session.teacher_name || "Teacher pending"} - {session.total_present ?? 0} present / {session.total_absent ?? 0} absent
+                </Text>
+              </Card>
+            ))}
+          </View>
+        ) : (
+          <EmptyState title="No sessions yet" description="Teacher roll-call sessions will appear here once recorded." />
+        )}
+
+        <SectionTitle title="Recent Records" subtitle="Latest learner attendance entries." />
+        {recordsQuery.isLoading && !recordsQuery.data ? (
+          <LoadingState label="Loading attendance records..." />
+        ) : records.length ? (
+          <View style={{ gap: 12 }}>
+            {records.slice(0, 20).map((record) => (
+              <Card key={record.id}>
+                <Tag
+                  label={record.status}
+                  tone={["present", "Present"].includes(record.status) ? "success" : ["late", "Late"].includes(record.status) ? "warning" : "danger"}
+                />
+                <Text style={{ fontWeight: "800", color: "#102032" }}>
+                  {record.student?.user?.name || record.student_name || "Student"}
+                </Text>
+                <Text style={{ color: "#667085" }}>
+                  {record.session_student_class || "Class"} - {formatDate(record.session_date)}
+                </Text>
+              </Card>
+            ))}
+          </View>
+        ) : (
+          <EmptyState title="No attendance records" description="Attendance records will appear after teachers submit roll calls." />
         )}
       </Screen>
     );

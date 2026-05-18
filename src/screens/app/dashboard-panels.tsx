@@ -170,6 +170,16 @@ export function SchoolAdminDashboardPanel() {
     enabled: Boolean(user && schoolId),
   });
 
+  const studentUsersQuery = useQuery({
+    queryKey: ["users", "school", schoolId, "students", "dashboard"],
+    queryFn: () =>
+      usersService.getUsersBySchool(schoolId, {
+        role: "STUDENT",
+        page_size: 500,
+      }),
+    enabled: Boolean(user && schoolId),
+  });
+
   const attendanceQuery = useQuery({
     queryKey: queryKeys.attendance.records({ limit: 500 }),
     queryFn: () => attendanceService.getAttendanceRecords({ limit: 500 }),
@@ -197,11 +207,14 @@ export function SchoolAdminDashboardPanel() {
       Math.max(
         Number(registrySummaryQuery.data?.active_enrollment || 0),
         Number(registrySummaryQuery.data?.student_profiles || 0),
+        Number(registrySummaryQuery.data?.student_accounts || 0),
         studentsQuery.data?.count ?? 0,
         studentsQuery.data?.results?.length ?? 0,
+        studentUsersQuery.data?.count ?? 0,
+        studentUsersQuery.data?.results?.length ?? 0,
         Number(schoolQuery.data?.student_count || 0)
       ),
-    [registrySummaryQuery.data, schoolQuery.data?.student_count, studentsQuery.data]
+    [registrySummaryQuery.data, schoolQuery.data?.student_count, studentUsersQuery.data, studentsQuery.data]
   );
 
   const attendanceHealth = useMemo(() => {
