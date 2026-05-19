@@ -58,6 +58,7 @@ function openPayloadIfPossible(payload: any) {
 
 export function FeedbackScreen() {
   const { user } = useAuth();
+  const { enqueue, isOnline } = useSync();
   const elevated = isExecutiveRole(user?.role) || isSchoolAdminRole(user?.role);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -78,12 +79,11 @@ export function FeedbackScreen() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      feedbackService.createFeedback({
-        subject: subject.trim(),
-        message: message.trim(),
-        priority: priority as "Low" | "Medium" | "High" | "Critical",
-      }),
+    mutationFn: (payload: {
+      subject: string;
+      message: string;
+      priority: "Low" | "Medium" | "High" | "Critical";
+    }) => feedbackService.createFeedback(payload),
     onSuccess: async () => {
       setSubject("");
       setMessage("");
@@ -93,6 +93,37 @@ export function FeedbackScreen() {
     onError: (error) => Alert.alert("Feedback failed", getApiErrorMessage(error)),
   });
 
+  const byStatus = (statsQuery.data?.by_status ?? {}) as Record<string, number | undefined>;
+  const openTickets =
+    (statsQuery.data?.open as number | undefined) ??
+    (byStatus.New ?? 0) + (byStatus.In_Progress ?? 0) + (byStatus["In Progress"] ?? 0);
+  const resolvedTickets =
+    (statsQuery.data?.resolved as number | undefined) ??
+    (byStatus.Resolved ?? 0) + (byStatus.Closed ?? 0);
+
+  async function handleSubmitFeedback() {
+    const payload = {
+      subject: subject.trim(),
+      message: message.trim(),
+      priority: priority as "Low" | "Medium" | "High" | "Critical",
+    };
+
+    if (!payload.subject || !payload.message) {
+      Alert.alert("Missing details", "Subject and message are required.");
+      return;
+    }
+
+    if (!isOnline) {
+      await enqueue("CREATE_FEEDBACK", payload, `Submit feedback: ${payload.subject}`);
+      setSubject("");
+      setMessage("");
+      Alert.alert("Feedback sent", "Your feedback has been submitted successfully.");
+      return;
+    }
+
+    createMutation.mutate(payload);
+  }
+
   return (
     <Screen
       title="Feedback"
@@ -100,8 +131,8 @@ export function FeedbackScreen() {
     >
       {elevated ? (
         <View style={{ gap: 12 }}>
-          <StatCard label="Open Tickets" value={statsQuery.data?.open ?? feedbackQuery.data?.count ?? 0} helper="Current feedback volume visible to this role." />
-          <StatCard label="Resolved" value={statsQuery.data?.resolved ?? 0} helper="Feedback items already resolved." tone="success" />
+          <StatCard label="Open Tickets" value={statsQuery.data ? openTickets : feedbackQuery.data?.count ?? 0} helper="Current feedback volume visible to this role." />
+          <StatCard label="Resolved" value={resolvedTickets} helper="Feedback items already resolved." tone="success" />
         </View>
       ) : null}
 
@@ -110,7 +141,7 @@ export function FeedbackScreen() {
         <Field label="Subject" value={subject} onChangeText={setSubject} placeholder="What needs attention?" />
         <Field label="Priority" value={priority} onChangeText={setPriority} placeholder="Low, Medium, High, Critical" />
         <Field label="Message" value={message} onChangeText={setMessage} placeholder="Describe the issue or suggestion" multiline />
-        <AppButton label="Submit Feedback" onPress={() => createMutation.mutate()} loading={createMutation.isPending} />
+        <AppButton label="Submit Feedback" onPress={() => void handleSubmitFeedback()} loading={createMutation.isPending} />
       </Card>
 
       <SectionTitle title="Feedback Registry" subtitle="Latest tickets available to this role." />
@@ -201,12 +232,25 @@ export function SubscriptionScreen() {
 
 export function RewardsScreen() {
   const { user } = useAuth();
-  const studentRole = user?.role === "STUDENT" || isSchoolAdminRole(user?.role);
+  const isStudent = user?.role === "STUDENT";
+  const showsSchoolHonourRoll = isSchoolAdminRole(user?.role);
 
   const honourRollQuery = useQuery({
     queryKey: ["students", "honour-roll", user?.role],
     queryFn: () => studentsService.getHonourRoll({ page_size: 40 }),
-    enabled: studentRole,
+    enabled: showsSchoolHonourRoll,
+  });
+
+  const studentProfileQuery = useQuery({
+    queryKey: ["students", "me", "rewards"],
+    queryFn: () => studentsService.getMyProfile(),
+    enabled: isStudent,
+  });
+
+  const studentAnnualQuery = useQuery({
+    queryKey: ["grades", "annual", "rewards"],
+    queryFn: () => gradesService.getAnnualResults({ page_size: 5 }),
+    enabled: isStudent,
   });
 
   const remarksQuery = useQuery({
@@ -215,15 +259,46 @@ export function RewardsScreen() {
       isSchoolAdminRole(user?.role)
         ? staffRemarksService.getRemarks({ page_size: 40 })
         : staffRemarksService.getMyRemarks({ page_size: 40 }),
-    enabled: !studentRole,
+    enabled: !isStudent && !showsSchoolHonourRoll,
   });
+
+  const studentAverage =
+    studentProfileQuery.data?.annual_average ??
+    studentAnnualQuery.data?.results?.[0]?.annual_average ??
+    studentAnnualQuery.data?.results?.[0]?.annual_avg ??
+    0;
+  const studentOnHonourRoll =
+    Boolean(studentProfileQuery.data?.is_on_honour_roll || studentAnnualQuery.data?.results?.[0]?.is_on_honour_roll) ||
+    Number(studentAverage) >= 15;
 
   return (
     <Screen
       title="Academic Reward"
       subtitle="Honour-roll and recognition data available to this role from the shared backend."
     >
-      {studentRole ? (
+      {isStudent ? (
+        (studentProfileQuery.isLoading || studentAnnualQuery.isLoading) && !studentProfileQuery.data ? (
+          <LoadingState label="Loading reward profile..." />
+        ) : studentProfileQuery.data ? (
+          <Card>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              <Tag label={studentProfileQuery.data.student_class || "Student"} />
+              <Tag
+                label={studentOnHonourRoll ? "Honour Roll" : "Progressing"}
+                tone={studentOnHonourRoll ? "success" : "warning"}
+              />
+            </View>
+            <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>
+              {studentProfileQuery.data.user?.name || user?.name || "Student"}
+            </Text>
+            <Text style={{ color: "#667085", lineHeight: 19 }}>
+              Annual average: {Number(studentAverage).toFixed(2)} / 20
+            </Text>
+          </Card>
+        ) : (
+          <EmptyState title="No reward profile" description="Your academic recognition will appear once your student profile is active." />
+        )
+      ) : showsSchoolHonourRoll ? (
         honourRollQuery.isLoading && !honourRollQuery.data ? (
           <LoadingState label="Loading honour roll..." />
         ) : (honourRollQuery.data?.results ?? []).length ? (

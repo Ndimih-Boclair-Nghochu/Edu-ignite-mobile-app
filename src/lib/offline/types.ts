@@ -6,6 +6,7 @@ import {
   CreateBookRequestTicket,
   CreateExamRequest,
   CreateExamSubmissionRequest,
+  CreateFeedbackRequest,
   CreateGradeRequest,
   CreateLiveClassRequest,
   CreateSchoolFeeAssignmentRequest,
@@ -18,6 +19,7 @@ import {
 export type SyncActionType =
   | "CREATE_STUDENT"
   | "CREATE_ANNOUNCEMENT"
+  | "CREATE_FEEDBACK"
   | "CREATE_SCHOOL_FEE_ASSIGNMENT"
   | "UPDATE_STUDENT_SCHOOL_FEE_RECORD"
   | "SEND_MESSAGE"
@@ -38,6 +40,7 @@ export type SyncActionType =
 export type SyncActionPayloadMap = {
   CREATE_STUDENT: CreateStudentRequest;
   CREATE_ANNOUNCEMENT: CreateAnnouncementRequest;
+  CREATE_FEEDBACK: CreateFeedbackRequest;
   CREATE_SCHOOL_FEE_ASSIGNMENT: CreateSchoolFeeAssignmentRequest;
   UPDATE_STUDENT_SCHOOL_FEE_RECORD: {
     id: string;
@@ -106,6 +109,10 @@ export type SyncAction =
   | (SyncActionBase & {
       type: "CREATE_ANNOUNCEMENT";
       payload: SyncActionPayloadMap["CREATE_ANNOUNCEMENT"];
+    })
+  | (SyncActionBase & {
+      type: "CREATE_FEEDBACK";
+      payload: SyncActionPayloadMap["CREATE_FEEDBACK"];
     })
   | (SyncActionBase & {
       type: "CREATE_SCHOOL_FEE_ASSIGNMENT";

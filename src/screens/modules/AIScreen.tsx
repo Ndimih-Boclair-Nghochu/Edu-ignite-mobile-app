@@ -12,13 +12,17 @@ import {
   StatCard,
   Tag,
 } from "@/components/ui";
+import { isExecutiveRole, isSchoolAdminRole } from "@/features/roles";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { aiService } from "@/lib/api/services/ai.service";
 import { formatDateTime } from "@/lib/utils/format";
+import { useAuth } from "@/providers/AuthProvider";
 
 export function AIScreen() {
+  const { user } = useAuth();
   const [prompt, setPrompt] = useState("");
   const [reply, setReply] = useState<string | null>(null);
+  const canUsePlatformInsights = isExecutiveRole(user?.role) || isSchoolAdminRole(user?.role);
 
   const requestsQuery = useQuery({
     queryKey: ["ai", "requests"],
@@ -33,6 +37,7 @@ export function AIScreen() {
   const platformInsightQuery = useQuery({
     queryKey: ["ai", "platform-insights"],
     queryFn: () => aiService.getPlatformInsights(),
+    enabled: canUsePlatformInsights,
   });
 
   const directChatMutation = useMutation({
@@ -59,7 +64,9 @@ export function AIScreen() {
         <StatCard label="AI Requests" value={requestsQuery.data?.results?.length ?? 0} helper="Recent AI requests logged for this account." />
         <StatCard label="Completed" value={completedCount} helper="AI requests already finished." tone="success" />
         <StatCard label="Insights" value={insightsQuery.data?.results?.length ?? 0} helper="Generated institution insights available now." />
-        <StatCard label="Platform Insight" value={platformInsightQuery.data?.status || "ready"} helper="Latest institutional AI response." />
+        {canUsePlatformInsights ? (
+          <StatCard label="Platform Insight" value={platformInsightQuery.data?.status || "ready"} helper="Latest institutional AI response." />
+        ) : null}
       </View>
 
       <Card>

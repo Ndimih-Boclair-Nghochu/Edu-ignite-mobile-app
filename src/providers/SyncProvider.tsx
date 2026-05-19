@@ -6,6 +6,7 @@ import { assignmentsService } from "@/lib/api/services/assignments.service";
 import { attendanceService } from "@/lib/api/services/attendance.service";
 import { chatService } from "@/lib/api/services/chat.service";
 import { examsService } from "@/lib/api/services/exams.service";
+import { feedbackService } from "@/lib/api/services/feedback.service";
 import { feesService } from "@/lib/api/services/fees.service";
 import { gradesService } from "@/lib/api/services/grades.service";
 import { libraryService } from "@/lib/api/services/library.service";
@@ -81,6 +82,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       case "CREATE_ANNOUNCEMENT":
         await announcementsService.createAnnouncement(action.payload);
         queryClient.invalidateQueries({ queryKey: ["announcements"] });
+        break;
+      case "CREATE_FEEDBACK":
+        await feedbackService.createFeedback(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["feedback"] });
         break;
       case "CREATE_SCHOOL_FEE_ASSIGNMENT":
         await feesService.createSchoolFeeAssignment(action.payload);

@@ -22,10 +22,10 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useSync } from "@/providers/SyncProvider";
 
 const targetOptions = [
-  { label: "All", value: "all" },
-  { label: "Students", value: "students" },
-  { label: "Teachers", value: "teachers" },
-  { label: "Parents", value: "parents" },
+  { label: "All", value: "SCHOOL_ALL" },
+  { label: "Students", value: "STUDENT" },
+  { label: "Teachers", value: "TEACHER" },
+  { label: "Parents", value: "PARENT" },
 ];
 
 export function AnnouncementsScreen() {
@@ -36,9 +36,9 @@ export function AnnouncementsScreen() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [target, setTarget] = useState("all");
+  const [target, setTarget] = useState("SCHOOL_ALL");
 
-  const canCompose = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "BURSAR", "LIBRARIAN"].includes(
+  const canCompose = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER", "CEO", "CTO"].includes(
     user?.role ?? ""
   );
 
@@ -54,7 +54,7 @@ export function AnnouncementsScreen() {
       setComposeOpen(false);
       setTitle("");
       setContent("");
-      setTarget("all");
+      setTarget("SCHOOL_ALL");
       await announcementsQuery.refetch();
       Alert.alert("Announcement created", "The notice has been sent through the shared backend.");
     },
@@ -84,7 +84,7 @@ export function AnnouncementsScreen() {
       setComposeOpen(false);
       setTitle("");
       setContent("");
-      setTarget("all");
+      setTarget("SCHOOL_ALL");
       Alert.alert("Announcement saved", "The announcement has been recorded.");
       return;
     }
