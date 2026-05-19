@@ -341,7 +341,7 @@ export function AttendanceScreen() {
               <OptionChips
                 label="Status"
                 options={attendanceStatuses}
-                value={statusMap[student.id] ?? "Present"}
+                value={statusMap[student.id] ?? "present"}
                 onChange={(value) =>
                   setStatusMap((current) => ({ ...current, [student.id]: value }))
                 }

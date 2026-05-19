@@ -2,10 +2,14 @@ import NetInfo from "@react-native-community/netinfo";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { announcementsService } from "@/lib/api/services/announcements.service";
+import { assignmentsService } from "@/lib/api/services/assignments.service";
 import { attendanceService } from "@/lib/api/services/attendance.service";
 import { chatService } from "@/lib/api/services/chat.service";
+import { examsService } from "@/lib/api/services/exams.service";
 import { feesService } from "@/lib/api/services/fees.service";
+import { gradesService } from "@/lib/api/services/grades.service";
 import { libraryService } from "@/lib/api/services/library.service";
+import { liveClassesService } from "@/lib/api/services/live-classes.service";
 import { schoolsService } from "@/lib/api/services/schools.service";
 import { studentsService } from "@/lib/api/services/students.service";
 import { appendQueueItem, getStoredQueue, removeQueueItem, saveQueue } from "@/lib/offline/queue";
@@ -132,6 +136,35 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         await schoolsService.createHierarchySubject(action.payload);
         queryClient.invalidateQueries({ queryKey: ["schools", "hierarchy"] });
         queryClient.invalidateQueries({ queryKey: ["grades", "subjects"] });
+        break;
+      case "CREATE_ASSIGNMENT":
+        await assignmentsService.createAssignment(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["assignments"] });
+        break;
+      case "SUBMIT_ASSIGNMENT":
+        await assignmentsService.createSubmission(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["assignments"] });
+        break;
+      case "GRADE_ASSIGNMENT_SUBMISSION":
+        await assignmentsService.gradeSubmission(action.payload.id, action.payload.data);
+        queryClient.invalidateQueries({ queryKey: ["assignments"] });
+        break;
+      case "CREATE_EXAM":
+        await examsService.createExam(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["exams"] });
+        break;
+      case "SUBMIT_EXAM":
+        await examsService.createSubmission(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["exams"] });
+        break;
+      case "CREATE_LIVE_CLASS":
+        await liveClassesService.createLiveClass(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["live-classes"] });
+        queryClient.invalidateQueries({ queryKey: ["schedule"] });
+        break;
+      case "CREATE_GRADE":
+        await gradesService.createGrade(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["grades"] });
         break;
       default:
         break;

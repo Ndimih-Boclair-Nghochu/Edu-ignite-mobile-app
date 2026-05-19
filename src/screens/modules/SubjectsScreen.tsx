@@ -36,6 +36,7 @@ function buildSubjectCode(name: string) {
 
 export function SubjectsScreen() {
   const { user } = useAuth();
+  const isStudent = user?.role === "STUDENT";
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [selectedClassId, setSelectedClassId] = useState("all");
@@ -48,7 +49,7 @@ export function SubjectsScreen() {
   const [subjectType, setSubjectType] = useState<"mandatory" | "optional">("mandatory");
   const [coefficient, setCoefficient] = useState("2");
 
-  const canManage = ["SCHOOL_ADMIN", "SUB_ADMIN", "TEACHER"].includes(user?.role ?? "");
+  const canManage = ["SCHOOL_ADMIN", "SUB_ADMIN"].includes(user?.role ?? "");
 
   const schoolQuery = useQuery({
     queryKey: queryKeys.schools.me,
@@ -73,7 +74,13 @@ export function SubjectsScreen() {
   const subjectsQuery = useQuery({
     queryKey: ["grades", "subjects", schoolId || "current"],
     queryFn: () => gradesService.getSubjects({ page_size: 300 }),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && !isStudent,
+  });
+
+  const enrollmentsQuery = useQuery({
+    queryKey: ["grades", "student-subject-enrollments", user?.id],
+    queryFn: () => gradesService.getStudentSubjectEnrollments({ page_size: 300 }),
+    enabled: isStudent,
   });
 
   const sequencesQuery = useQuery({
@@ -90,7 +97,7 @@ export function SubjectsScreen() {
         page_size: 300,
         ordering: "name",
       }),
-    enabled: Boolean(schoolId),
+    enabled: Boolean(schoolId) && canManage,
   });
 
   const createSubjectMutation = useMutation({
@@ -158,9 +165,45 @@ export function SubjectsScreen() {
     },
   });
 
+  const studentSubjectAllocations = useMemo(
+    () =>
+      (enrollmentsQuery.data?.results ?? []).map((entry) => ({
+        id: entry.id,
+        school_class: entry.school_class,
+        class_name: entry.class_name,
+        subject: entry.subject,
+        subject_name: entry.subject_name,
+        subject_code: entry.subject_code,
+        coefficient: entry.coefficient,
+        teacher: entry.teacher,
+        teacher_name: entry.teacher_name,
+        type: entry.type,
+        sub_school: null,
+      })),
+    [enrollmentsQuery.data?.results]
+  );
+
+  const visibleSubjectAllocations = isStudent
+    ? studentSubjectAllocations
+    : hierarchySubjectsQuery.data ?? [];
+
+  const studentSubjectCatalog = useMemo(() => {
+    const rows = new Map<string, { id: string; name: string; code?: string; coefficient?: number | string; teacher_name?: string }>();
+    for (const entry of enrollmentsQuery.data?.results ?? []) {
+      rows.set(entry.subject, {
+        id: entry.subject,
+        name: entry.subject_name,
+        code: entry.subject_code,
+        coefficient: entry.coefficient,
+        teacher_name: entry.teacher_name,
+      });
+    }
+    return Array.from(rows.values());
+  }, [enrollmentsQuery.data?.results]);
+
   const filteredAssignments = useMemo(() => {
     const keyword = deferredSearch.trim().toLowerCase();
-    return (hierarchySubjectsQuery.data ?? []).filter((entry) => {
+    return visibleSubjectAllocations.filter((entry) => {
       const classMatch = selectedClassId === "all" || entry.school_class === selectedClassId;
       const typeMatch = selectedType === "all" || entry.type === selectedType;
       const searchMatch =
@@ -170,12 +213,17 @@ export function SubjectsScreen() {
           .includes(keyword);
       return classMatch && typeMatch && searchMatch;
     });
-  }, [deferredSearch, hierarchySubjectsQuery.data, selectedClassId, selectedType]);
+  }, [deferredSearch, selectedClassId, selectedType, visibleSubjectAllocations]);
 
   const classCoverage = useMemo(
-    () => new Set((hierarchySubjectsQuery.data ?? []).map((entry) => entry.school_class)).size,
-    [hierarchySubjectsQuery.data]
+    () => new Set(visibleSubjectAllocations.map((entry) => entry.school_class)).size,
+    [visibleSubjectAllocations]
   );
+
+  const subjectCatalogCount = isStudent
+    ? studentSubjectCatalog.length
+    : subjectsQuery.data?.results?.length ?? 0;
+  const classSubjectCount = visibleSubjectAllocations.length;
 
   return (
     <Screen
@@ -190,8 +238,8 @@ export function SubjectsScreen() {
       />
 
       <View style={{ gap: 12 }}>
-        <StatCard label="Subject Catalog" value={subjectsQuery.data?.results?.length ?? 0} helper="Academic subjects currently registered." />
-        <StatCard label="Class Subjects" value={hierarchySubjectsQuery.data?.length ?? 0} helper="Allocated class-subject relationships." />
+        <StatCard label="Subject Catalog" value={subjectCatalogCount} helper="Academic subjects currently registered." />
+        <StatCard label="Class Subjects" value={classSubjectCount} helper="Allocated class-subject relationships." />
         <StatCard label="Class Coverage" value={classCoverage} helper="Classes currently carrying at least one subject." />
         <StatCard label="Sequences" value={sequencesQuery.data?.results?.length ?? 0} helper="Academic sequences available for grading and exams." />
       </View>
@@ -217,7 +265,7 @@ export function SubjectsScreen() {
       </Card>
 
       <SectionTitle title="Class Subject Allocations" subtitle="Subjects currently attached to school classes." />
-      {hierarchySubjectsQuery.isLoading && !hierarchySubjectsQuery.data ? (
+      {(isStudent ? enrollmentsQuery.isLoading && !enrollmentsQuery.data : hierarchySubjectsQuery.isLoading && !hierarchySubjectsQuery.data) ? (
         <LoadingState label="Loading subject allocations..." />
       ) : filteredAssignments.length ? (
         <View style={{ gap: 12 }}>
@@ -250,8 +298,31 @@ export function SubjectsScreen() {
         />
       )}
 
-      <SectionTitle title="Academic Subject Catalog" subtitle="Standalone subject records available to the institution." />
-      {subjectsQuery.isLoading && !subjectsQuery.data ? (
+      <SectionTitle title="Academic Subject Catalog" subtitle={isStudent ? "Subjects currently linked to this learner." : "Standalone subject records available to the institution."} />
+      {isStudent ? (
+        enrollmentsQuery.isLoading && !enrollmentsQuery.data ? (
+          <LoadingState label="Loading subject catalog..." />
+        ) : studentSubjectCatalog.length ? (
+          <View style={{ gap: 12 }}>
+            {studentSubjectCatalog.map((entry) => (
+              <Card key={entry.id}>
+                <Text style={{ fontWeight: "800", color: "#102032", fontSize: 15 }}>{entry.name}</Text>
+                <Text style={{ color: "#667085" }}>
+                  {entry.code || "Code pending"} - Coefficient: {entry.coefficient || 0}
+                </Text>
+                <Text style={{ color: "#667085", lineHeight: 20 }}>
+                  Teacher: {entry.teacher_name || "Not assigned"}
+                </Text>
+              </Card>
+            ))}
+          </View>
+        ) : (
+          <EmptyState
+            title="No subjects linked"
+            description="Subjects assigned to this learner will appear here."
+          />
+        )
+      ) : subjectsQuery.isLoading && !subjectsQuery.data ? (
         <LoadingState label="Loading subject catalog..." />
       ) : (subjectsQuery.data?.results ?? []).length ? (
         <View style={{ gap: 12 }}>

@@ -7,6 +7,7 @@ import {
   EmptyState,
   Field,
   LoadingState,
+  ModalSheet,
   OptionChips,
   Screen,
   SectionTitle,
@@ -36,6 +37,7 @@ import {
 } from "@/lib/school-student-roster";
 import { formatDate, formatDateTime, formatMoney, formatRole } from "@/lib/utils/format";
 import { useAuth } from "@/providers/AuthProvider";
+import { useSync } from "@/providers/SyncProvider";
 import { palette } from "@/theme";
 
 function openPayloadIfPossible(payload: any) {
@@ -307,6 +309,15 @@ export function ChildrenScreen() {
 
 export function GradesScreen() {
   const { user } = useAuth();
+  const { enqueue, isOnline } = useSync();
+  const isTeacher = user?.role === "TEACHER";
+  const [gradeOpen, setGradeOpen] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [selectedSequenceId, setSelectedSequenceId] = useState<string | null>(null);
+  const [score, setScore] = useState("");
+  const [comment, setComment] = useState("");
+
   const gradesQuery = useQuery({
     queryKey: ["grades", "screen", user?.role],
     queryFn: () => gradesService.getGrades({ page_size: 80 }),
@@ -318,13 +329,107 @@ export function GradesScreen() {
     enabled: user?.role === "STUDENT" || user?.role === "PARENT",
   });
 
+  const studentsQuery = useQuery({
+    queryKey: ["grades", "teacher-students"],
+    queryFn: () => studentsService.getStudents({ page_size: 500 }),
+    enabled: isTeacher,
+  });
+
+  const sequencesQuery = useQuery({
+    queryKey: ["grades", "teacher-sequences"],
+    queryFn: () => gradesService.getSequences({ page_size: 80 }),
+    enabled: isTeacher,
+  });
+
+  const enrollmentsQuery = useQuery({
+    queryKey: ["grades", "teacher-enrollments"],
+    queryFn: () => gradesService.getStudentSubjectEnrollments({ page_size: 500 }),
+    enabled: isTeacher,
+  });
+
   const average =
     annualQuery.data?.results?.[0]?.annual_average ?? annualQuery.data?.results?.[0]?.annual_avg ?? 0;
+
+  const teacherStudentOptions = useMemo(() => {
+    const linkedStudentIds = new Set((enrollmentsQuery.data?.results ?? []).map((entry) => entry.student));
+    return (studentsQuery.data?.results ?? [])
+      .filter((student) => linkedStudentIds.size === 0 || linkedStudentIds.has(student.id))
+      .map((student) => ({
+        label: `${student.user?.name || "Student"} (${student.student_class || student.school_class_name || "Class"})`,
+        value: student.id,
+      }));
+  }, [enrollmentsQuery.data?.results, studentsQuery.data?.results]);
+
+  const subjectOptions = useMemo(() => {
+    const rows = (enrollmentsQuery.data?.results ?? []).filter(
+      (entry) => !selectedStudentId || entry.student === selectedStudentId
+    );
+    const unique = new Map<string, string>();
+    rows.forEach((entry) => unique.set(entry.subject, entry.subject_name));
+    return Array.from(unique.entries()).map(([value, label]) => ({ value, label }));
+  }, [enrollmentsQuery.data?.results, selectedStudentId]);
+
+  const createGradeMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedStudentId || !selectedSubjectId || !selectedSequenceId) {
+        throw new Error("Student, subject, and sequence are required.");
+      }
+      return gradesService.createGrade({
+        student: selectedStudentId,
+        subject: selectedSubjectId,
+        sequence: selectedSequenceId,
+        score: Number.parseFloat(score),
+        comment: comment.trim(),
+      });
+    },
+    onSuccess: async () => {
+      setGradeOpen(false);
+      setSelectedStudentId(null);
+      setSelectedSubjectId(null);
+      setSelectedSequenceId(null);
+      setScore("");
+      setComment("");
+      await gradesQuery.refetch();
+      Alert.alert("Grade saved", "The mark has been recorded.");
+    },
+    onError: (error) => Alert.alert("Grade save failed", getApiErrorMessage(error)),
+  });
+
+  async function handleCreateGrade() {
+    const numericScore = Number.parseFloat(score);
+    if (!selectedStudentId || !selectedSubjectId || !selectedSequenceId || !Number.isFinite(numericScore)) {
+      Alert.alert("Missing details", "Select a student, subject, sequence, and valid score.");
+      return;
+    }
+
+    const payload = {
+      student: selectedStudentId,
+      subject: selectedSubjectId,
+      sequence: selectedSequenceId,
+      score: numericScore,
+      comment: comment.trim(),
+    };
+
+    if (!isOnline) {
+      await enqueue("CREATE_GRADE", payload, "Create grade");
+      setGradeOpen(false);
+      setSelectedStudentId(null);
+      setSelectedSubjectId(null);
+      setSelectedSequenceId(null);
+      setScore("");
+      setComment("");
+      Alert.alert("Grade saved", "The mark has been recorded.");
+      return;
+    }
+
+    createGradeMutation.mutate();
+  }
 
   return (
     <Screen
       title="Report Card"
-      subtitle="Recorded marks and academic outcomes visible to this account type."
+      subtitle={isTeacher ? "Record marks and review gradebook entries." : "Recorded marks and academic outcomes visible to this account type."}
+      rightAction={isTeacher ? <AppButton compact label="Add Mark" onPress={() => setGradeOpen(true)} /> : undefined}
     >
       <View style={{ gap: 12 }}>
         <StatCard label="Recorded Grades" value={gradesQuery.data?.count ?? 0} helper="Marks currently available to this role." />
@@ -341,20 +446,50 @@ export function GradesScreen() {
           {(gradesQuery.data?.results ?? []).map((grade) => (
             <Card key={grade.id}>
               <Text style={{ fontWeight: "800", color: "#102032", fontSize: 16 }}>
-                {grade.subject?.name || "Subject"}
+                {(grade as any).subject_name || grade.subject?.name || "Subject"}
               </Text>
               <Text style={{ color: "#667085", lineHeight: 19 }}>
-                {grade.score}/20 • {grade.sequence?.name || "Sequence"}
+                {grade.score}/20 - {grade.sequence?.name || "Sequence"}
               </Text>
               <Text style={{ color: "#667085", lineHeight: 19 }}>
-                {grade.student || "Student"} • {formatDate(grade.created_at)}
+                {(grade as any).student_name || grade.student || "Student"} - {formatDate(grade.created_at)}
               </Text>
+              {grade.comment ? <Text style={{ color: "#667085", lineHeight: 19 }}>{grade.comment}</Text> : null}
             </Card>
           ))}
         </View>
       ) : (
         <EmptyState title="No grades recorded" description="Grades will appear here once assessments are published." />
       )}
+
+      <ModalSheet visible={gradeOpen} title="Add Mark" onClose={() => setGradeOpen(false)}>
+        <View style={{ gap: 16 }}>
+          <OptionChips
+            label="Student"
+            options={teacherStudentOptions}
+            value={selectedStudentId}
+            onChange={(value) => {
+              setSelectedStudentId(value);
+              setSelectedSubjectId(null);
+            }}
+          />
+          <OptionChips
+            label="Subject"
+            options={subjectOptions}
+            value={selectedSubjectId}
+            onChange={setSelectedSubjectId}
+          />
+          <OptionChips
+            label="Sequence"
+            options={(sequencesQuery.data?.results ?? []).map((entry) => ({ label: entry.name, value: entry.id }))}
+            value={selectedSequenceId}
+            onChange={setSelectedSequenceId}
+          />
+          <Field label="Score" value={score} onChangeText={setScore} keyboardType="numeric" placeholder="Score out of 20" />
+          <Field label="Comment" value={comment} onChangeText={setComment} placeholder="Teacher comment" multiline />
+          <AppButton label="Save Mark" onPress={() => void handleCreateGrade()} loading={createGradeMutation.isPending} />
+        </View>
+      </ModalSheet>
     </Screen>
   );
 }

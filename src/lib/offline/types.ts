@@ -1,9 +1,16 @@
 import {
   AttendanceSession,
   CreateAnnouncementRequest,
+  CreateAssignmentRequest,
+  CreateAssignmentSubmissionRequest,
   CreateBookRequestTicket,
+  CreateExamRequest,
+  CreateExamSubmissionRequest,
+  CreateGradeRequest,
+  CreateLiveClassRequest,
   CreateSchoolFeeAssignmentRequest,
   CreateStudentRequest,
+  GradeAssignmentSubmissionRequest,
   SendMessageRequest,
   UpdateStudentSchoolFeeRecordRequest,
 } from "@/lib/api/types";
@@ -19,7 +26,14 @@ export type SyncActionType =
   | "CREATE_SUB_SCHOOL"
   | "ASSIGN_SUB_ADMIN"
   | "CREATE_HIERARCHY_CLASS"
-  | "CREATE_HIERARCHY_SUBJECT";
+  | "CREATE_HIERARCHY_SUBJECT"
+  | "CREATE_ASSIGNMENT"
+  | "SUBMIT_ASSIGNMENT"
+  | "GRADE_ASSIGNMENT_SUBMISSION"
+  | "CREATE_EXAM"
+  | "SUBMIT_EXAM"
+  | "CREATE_LIVE_CLASS"
+  | "CREATE_GRADE";
 
 export type SyncActionPayloadMap = {
   CREATE_STUDENT: CreateStudentRequest;
@@ -66,6 +80,16 @@ export type SyncActionPayloadMap = {
     coefficient: number;
     school_id?: string;
   };
+  CREATE_ASSIGNMENT: CreateAssignmentRequest;
+  SUBMIT_ASSIGNMENT: CreateAssignmentSubmissionRequest;
+  GRADE_ASSIGNMENT_SUBMISSION: {
+    id: string;
+    data: GradeAssignmentSubmissionRequest;
+  };
+  CREATE_EXAM: CreateExamRequest;
+  SUBMIT_EXAM: CreateExamSubmissionRequest;
+  CREATE_LIVE_CLASS: CreateLiveClassRequest;
+  CREATE_GRADE: CreateGradeRequest;
 };
 
 type SyncActionBase = {
@@ -118,4 +142,32 @@ export type SyncAction =
   | (SyncActionBase & {
       type: "CREATE_HIERARCHY_SUBJECT";
       payload: SyncActionPayloadMap["CREATE_HIERARCHY_SUBJECT"];
+    })
+  | (SyncActionBase & {
+      type: "CREATE_ASSIGNMENT";
+      payload: SyncActionPayloadMap["CREATE_ASSIGNMENT"];
+    })
+  | (SyncActionBase & {
+      type: "SUBMIT_ASSIGNMENT";
+      payload: SyncActionPayloadMap["SUBMIT_ASSIGNMENT"];
+    })
+  | (SyncActionBase & {
+      type: "GRADE_ASSIGNMENT_SUBMISSION";
+      payload: SyncActionPayloadMap["GRADE_ASSIGNMENT_SUBMISSION"];
+    })
+  | (SyncActionBase & {
+      type: "CREATE_EXAM";
+      payload: SyncActionPayloadMap["CREATE_EXAM"];
+    })
+  | (SyncActionBase & {
+      type: "SUBMIT_EXAM";
+      payload: SyncActionPayloadMap["SUBMIT_EXAM"];
+    })
+  | (SyncActionBase & {
+      type: "CREATE_LIVE_CLASS";
+      payload: SyncActionPayloadMap["CREATE_LIVE_CLASS"];
+    })
+  | (SyncActionBase & {
+      type: "CREATE_GRADE";
+      payload: SyncActionPayloadMap["CREATE_GRADE"];
     });
