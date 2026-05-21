@@ -34,6 +34,20 @@ function ValueText({ value, helper }: { value: string; helper?: string }) {
   );
 }
 
+function getLoanBorrowerName(loan: { borrower?: string | { name?: string; role?: string }; borrower_name?: string }) {
+  return typeof loan.borrower === "object" && loan.borrower?.name
+    ? loan.borrower.name
+    : loan.borrower_name || "Borrower";
+}
+
+function getLoanBorrowerRole(loan: { borrower?: string | { role?: string } }) {
+  return typeof loan.borrower === "object" ? loan.borrower.role : undefined;
+}
+
+function getLoanBookTitle(loan: { book?: string | { title?: string }; book_title?: string }) {
+  return typeof loan.book === "object" && loan.book?.title ? loan.book.title : loan.book_title || "Book";
+}
+
 export function ExecutiveDashboardPanel() {
   const statsQuery = useQuery({
     queryKey: ["platform", "stats"],
@@ -460,9 +474,9 @@ export function BursarDashboardPanel() {
     enabled: Boolean(user),
   });
 
-  const recentPaymentsQuery = useQuery({
-    queryKey: ["bursar", "payments"],
-    queryFn: () => feesService.getPayments({ page_size: 25, ordering: "-payment_date" }),
+  const recentRecordsQuery = useQuery({
+    queryKey: ["bursar", "school-fee-records"],
+    queryFn: () => feesService.getStudentSchoolFees({ page_size: 25, ordering: "-last_recorded_at" }),
     enabled: Boolean(user),
   });
 
@@ -494,24 +508,24 @@ export function BursarDashboardPanel() {
         <EmptyState title="No class fee coverage yet" description="Class fee allocations will appear here once created." />
       )}
 
-      <SectionTitle title="Recent Payments" subtitle="Latest recorded financial activity." />
-      {(recentPaymentsQuery.data?.results ?? []).slice(0, 4).length ? (
+      <SectionTitle title="Recent School Fee Updates" subtitle="Latest learner balances recorded by the school." />
+      {(recentRecordsQuery.data?.results ?? []).slice(0, 4).length ? (
         <View style={{ gap: 12 }}>
-          {(recentPaymentsQuery.data?.results ?? []).slice(0, 4).map((payment) => (
-            <Card key={payment.id}>
+          {(recentRecordsQuery.data?.results ?? []).slice(0, 4).map((record) => (
+            <Card key={record.id}>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                <Tag label={payment.status || "Pending"} tone={payment.status === "Confirmed" ? "success" : "warning"} />
-                <Tag label={payment.payment_method || "Method"} />
+                <Tag label={record.status} tone={record.status === "paid" ? "success" : record.status === "incomplete" ? "warning" : "danger"} />
+                <Tag label={record.class_name || "Class"} />
               </View>
               <ValueText
-                value={payment.payer_name || payment.payer?.name || "Student"}
-                helper={`${formatMoney(payment.amount)} • ${payment.fee_name || payment.fee_structure_detail?.name || "Fee"}`}
+                value={record.student_name || "Student"}
+                helper={`${formatMoney(record.amount_paid)} collected - ${formatMoney(record.balance)} left`}
               />
             </Card>
           ))}
         </View>
       ) : (
-        <EmptyState title="No payments yet" description="Recorded fee payments will appear here." />
+        <EmptyState title="No school fee updates yet" description="Recorded learner balances will appear here." />
       )}
     </View>
   );
@@ -554,11 +568,11 @@ export function LibrarianDashboardPanel() {
             <Card key={loan.id}>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                 <Tag label={loan.status} tone={loan.status === "Returned" ? "success" : "warning"} />
-                <Tag label={formatRole(loan.borrower?.role)} />
+                <Tag label={formatRole(getLoanBorrowerRole(loan))} />
               </View>
               <ValueText
-                value={loan.borrower?.name || "Borrower"}
-                helper={`${loan.book?.title || "Book"} • due ${formatDate(loan.due_date)}`}
+                value={getLoanBorrowerName(loan)}
+                helper={`${getLoanBookTitle(loan)} - due ${formatDate(loan.due_date)}`}
               />
             </Card>
           ))}

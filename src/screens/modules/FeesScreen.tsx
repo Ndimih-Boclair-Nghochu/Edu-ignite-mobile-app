@@ -110,13 +110,18 @@ export function FeesScreen() {
     [classesQuery.data]
   );
 
+  const selectedClass = useMemo(
+    () => (classesQuery.data ?? []).find((item) => item.id === selectedClassId) ?? null,
+    [classesQuery.data, selectedClassId]
+  );
+
   const filteredRecords = useMemo(() => {
     const keyword = deferredSearch.trim().toLowerCase();
     return (recordsQuery.data?.results ?? []).filter((record) => {
       const classMatch =
         selectedClassId === "all" ||
         record.class_id === selectedClassId ||
-        record.fee_assignment === selectedClassId;
+        record.class_name === selectedClass?.name;
       const statusMatch = selectedStatus === "all" || record.status === selectedStatus;
       const searchMatch =
         !keyword ||
@@ -125,7 +130,7 @@ export function FeesScreen() {
           .includes(keyword);
       return classMatch && statusMatch && searchMatch;
     });
-  }, [deferredSearch, recordsQuery.data?.results, selectedClassId, selectedStatus]);
+  }, [deferredSearch, recordsQuery.data?.results, selectedClass?.name, selectedClassId, selectedStatus]);
 
   const filteredTotals = useMemo(() => {
     return filteredRecords.reduce(
@@ -245,7 +250,7 @@ export function FeesScreen() {
         <StatCard
           label="Students"
           value={filteredTotals.students}
-          helper={`${filteredTotals.paid} paid • ${filteredTotals.incomplete} incomplete • ${filteredTotals.unpaid} unpaid`}
+          helper={`${filteredTotals.paid} paid - ${filteredTotals.incomplete} incomplete - ${filteredTotals.unpaid} unpaid`}
         />
       </View>
 
@@ -317,11 +322,11 @@ export function FeesScreen() {
                 {assignment.school_class_name ?? "Assigned class"}
               </Text>
               <Text style={{ color: "#667085" }}>
-                {assignment.academic_year} • {formatMoney(assignment.amount, assignment.currency)}
+                {assignment.academic_year} - {formatMoney(assignment.amount, assignment.currency)}
               </Text>
               <Text style={{ color: "#667085", lineHeight: 20 }}>
-                Students: {assignment.student_count ?? 0} • Expected:{" "}
-                {formatMoney(assignment.total_expected, assignment.currency)} • Collected:{" "}
+                Students: {assignment.student_count ?? 0} - Expected:{" "}
+                {formatMoney(assignment.total_expected, assignment.currency)} - Collected:{" "}
                 {formatMoney(assignment.total_collected, assignment.currency)}
               </Text>
             </Card>
@@ -350,10 +355,10 @@ export function FeesScreen() {
                     {record.student_name ?? "Student"}
                   </Text>
                   <Text style={{ color: "#667085" }}>
-                    {record.class_name || "Class pending"} • {record.admission_number || record.student_matricule}
+                    {record.class_name || "Class pending"} - {record.admission_number || record.student_matricule}
                   </Text>
                   <Text style={{ color: "#667085", lineHeight: 20 }}>
-                    Total: {formatMoney(record.total_amount)} • Paid: {formatMoney(record.amount_paid)} • Left:{" "}
+                    Total: {formatMoney(record.total_amount)} - Paid: {formatMoney(record.amount_paid)} - Left:{" "}
                     {formatMoney(record.balance)}
                   </Text>
                 </View>

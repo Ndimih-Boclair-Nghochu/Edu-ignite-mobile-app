@@ -139,7 +139,7 @@ export const APP_MODULES: AppModule[] = [
     description: "School identity, principal data, and institutional settings.",
     route: "SchoolSettings",
     icon: FileCog,
-    roles: ["SCHOOL_ADMIN"],
+    roles: SCHOOL_ADMIN_ROLES,
     group: "governance",
   },
   {
@@ -148,7 +148,7 @@ export const APP_MODULES: AppModule[] = [
     description: "Sub-schools, classes, sections, and allocation hierarchy.",
     route: "Structure",
     icon: Building2,
-    roles: ["SCHOOL_ADMIN"],
+    roles: SCHOOL_ADMIN_ROLES,
     group: "governance",
   },
   {
@@ -157,7 +157,7 @@ export const APP_MODULES: AppModule[] = [
     description: "School-wide trends, attendance health, and revenue visibility.",
     route: "Insights",
     icon: BarChart3,
-    roles: ["SCHOOL_ADMIN"],
+    roles: SCHOOL_ADMIN_ROLES,
     group: "governance",
   },
   {

@@ -4,6 +4,7 @@ import {
   CreateAssignmentRequest,
   CreateAssignmentSubmissionRequest,
   CreateBookRequestTicket,
+  CreateBookRequest,
   CreateExamRequest,
   CreateExamSubmissionRequest,
   CreateFeedbackRequest,
@@ -12,8 +13,10 @@ import {
   CreateSchoolFeeAssignmentRequest,
   CreateStudentRequest,
   GradeAssignmentSubmissionRequest,
+  ReviewBookRequestPayload,
   SendMessageRequest,
   UpdateStudentSchoolFeeRecordRequest,
+  UpdateBookRequest,
 } from "@/lib/api/types";
 
 export type SyncActionType =
@@ -25,6 +28,12 @@ export type SyncActionType =
   | "SEND_MESSAGE"
   | "BULK_RECORD_ATTENDANCE"
   | "CREATE_LIBRARY_REQUEST"
+  | "CREATE_LIBRARY_BOOK"
+  | "UPDATE_LIBRARY_BOOK"
+  | "APPROVE_LIBRARY_REQUEST"
+  | "REJECT_LIBRARY_REQUEST"
+  | "FULFILL_LIBRARY_REQUEST"
+  | "RETURN_LIBRARY_BOOK"
   | "CREATE_SUB_SCHOOL"
   | "ASSIGN_SUB_ADMIN"
   | "CREATE_HIERARCHY_CLASS"
@@ -57,6 +66,27 @@ export type SyncActionPayloadMap = {
     }>;
   };
   CREATE_LIBRARY_REQUEST: CreateBookRequestTicket;
+  CREATE_LIBRARY_BOOK: CreateBookRequest;
+  UPDATE_LIBRARY_BOOK: {
+    id: string;
+    data: UpdateBookRequest;
+  };
+  APPROVE_LIBRARY_REQUEST: {
+    id: string;
+    data?: ReviewBookRequestPayload;
+  };
+  REJECT_LIBRARY_REQUEST: {
+    id: string;
+    data?: ReviewBookRequestPayload;
+  };
+  FULFILL_LIBRARY_REQUEST: {
+    id: string;
+    data?: ReviewBookRequestPayload;
+  };
+  RETURN_LIBRARY_BOOK: {
+    loanId: string;
+    notes?: string;
+  };
   CREATE_SUB_SCHOOL: {
     name: string;
     vice_principal?: string | null;
@@ -133,6 +163,30 @@ export type SyncAction =
   | (SyncActionBase & {
       type: "CREATE_LIBRARY_REQUEST";
       payload: SyncActionPayloadMap["CREATE_LIBRARY_REQUEST"];
+    })
+  | (SyncActionBase & {
+      type: "CREATE_LIBRARY_BOOK";
+      payload: SyncActionPayloadMap["CREATE_LIBRARY_BOOK"];
+    })
+  | (SyncActionBase & {
+      type: "UPDATE_LIBRARY_BOOK";
+      payload: SyncActionPayloadMap["UPDATE_LIBRARY_BOOK"];
+    })
+  | (SyncActionBase & {
+      type: "APPROVE_LIBRARY_REQUEST";
+      payload: SyncActionPayloadMap["APPROVE_LIBRARY_REQUEST"];
+    })
+  | (SyncActionBase & {
+      type: "REJECT_LIBRARY_REQUEST";
+      payload: SyncActionPayloadMap["REJECT_LIBRARY_REQUEST"];
+    })
+  | (SyncActionBase & {
+      type: "FULFILL_LIBRARY_REQUEST";
+      payload: SyncActionPayloadMap["FULFILL_LIBRARY_REQUEST"];
+    })
+  | (SyncActionBase & {
+      type: "RETURN_LIBRARY_BOOK";
+      payload: SyncActionPayloadMap["RETURN_LIBRARY_BOOK"];
     })
   | (SyncActionBase & {
       type: "CREATE_SUB_SCHOOL";

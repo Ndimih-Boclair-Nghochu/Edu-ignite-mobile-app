@@ -955,19 +955,31 @@ export interface Book {
 
 export interface BookLoan {
   id: string;
-  book: Book;
-  borrower: User;
+  book: string | Book;
+  book_title?: string;
+  borrower: string | User;
+  borrower_name?: string;
+  requester_name?: string;
   issued_date: string;
   due_date: string;
   returned_date?: string;
   status: "Active" | "Returned" | "Overdue" | "Lost" | string;
+  days_overdue?: number;
   fine_amount: string;
+  fine_paid?: boolean;
 }
 
 export type Loan = BookLoan;
 
 export interface LibraryStats {
   [key: string]: unknown;
+  total_books?: number;
+  available_books?: number;
+  active_loans?: number;
+  loans_today?: number;
+  overdue_loans?: number;
+  low_stock_books?: number;
+  total_students?: number;
   pending_requests?: number;
 }
 

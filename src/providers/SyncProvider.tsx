@@ -125,6 +125,30 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         await libraryService.createRequest(action.payload);
         queryClient.invalidateQueries({ queryKey: ["library"] });
         break;
+      case "CREATE_LIBRARY_BOOK":
+        await libraryService.createBook(action.payload);
+        queryClient.invalidateQueries({ queryKey: ["library"] });
+        break;
+      case "UPDATE_LIBRARY_BOOK":
+        await libraryService.updateBook(action.payload.id, action.payload.data);
+        queryClient.invalidateQueries({ queryKey: ["library"] });
+        break;
+      case "APPROVE_LIBRARY_REQUEST":
+        await libraryService.approveRequest(action.payload.id, action.payload.data);
+        queryClient.invalidateQueries({ queryKey: ["library"] });
+        break;
+      case "REJECT_LIBRARY_REQUEST":
+        await libraryService.rejectRequest(action.payload.id, action.payload.data);
+        queryClient.invalidateQueries({ queryKey: ["library"] });
+        break;
+      case "FULFILL_LIBRARY_REQUEST":
+        await libraryService.fulfillRequest(action.payload.id, action.payload.data);
+        queryClient.invalidateQueries({ queryKey: ["library"] });
+        break;
+      case "RETURN_LIBRARY_BOOK":
+        await libraryService.returnBook(action.payload.loanId, action.payload.notes);
+        queryClient.invalidateQueries({ queryKey: ["library"] });
+        break;
       case "CREATE_SUB_SCHOOL":
         await schoolsService.createSubSchool(action.payload);
         queryClient.invalidateQueries({ queryKey: ["schools", "hierarchy"] });

@@ -7,16 +7,29 @@ import {
   BookRequest,
   CreateBookRequest,
   CreateBookRequestTicket,
+  LibraryStats,
   PaginatedResponse,
   ListParams,
   ReviewBookRequestPayload,
   UpdateBookRequest,
 } from '../types';
 
+function normalizePaginated<T>(data: PaginatedResponse<T> | T[]): PaginatedResponse<T> {
+  if (Array.isArray(data)) {
+    return {
+      count: data.length,
+      next: null,
+      previous: null,
+      results: data,
+    };
+  }
+  return data;
+}
+
 export const libraryService = {
   async getCategories(params?: ListParams): Promise<PaginatedResponse<BookCategory>> {
     const { data } = await apiClient.get(API.LIBRARY.CATEGORIES, { params });
-    return data;
+    return normalizePaginated<BookCategory>(data);
   },
 
   async getBookCategories(params?: ListParams): Promise<PaginatedResponse<BookCategory>> {
@@ -39,7 +52,7 @@ export const libraryService = {
 
   async getBooks(params?: ListParams): Promise<PaginatedResponse<Book>> {
     const { data } = await apiClient.get(API.LIBRARY.BOOKS, { params });
-    return data;
+    return normalizePaginated<Book>(data);
   },
 
   async getBook(id: string): Promise<Book> {
@@ -51,12 +64,12 @@ export const libraryService = {
     const { data } = await apiClient.get(API.LIBRARY.SEARCH, {
       params: { ...params, q: query },
     });
-    return data;
+    return normalizePaginated<Book>(data);
   },
 
   async getLowStockBooks(params?: ListParams): Promise<PaginatedResponse<Book>> {
     const { data } = await apiClient.get(API.LIBRARY.LOW_STOCK, { params });
-    return data;
+    return normalizePaginated<Book>(data);
   },
 
   async createBook(bookData: CreateBookRequest): Promise<Book> {
@@ -118,7 +131,7 @@ export const libraryService = {
 
   async getLoans(params?: ListParams): Promise<PaginatedResponse<BookLoan>> {
     const { data } = await apiClient.get(API.LIBRARY.LOANS, { params });
-    return data;
+    return normalizePaginated<BookLoan>(data);
   },
 
   async getLoan(id: string): Promise<BookLoan> {
@@ -154,22 +167,22 @@ export const libraryService = {
 
   async getMyLoans(params?: ListParams): Promise<PaginatedResponse<BookLoan>> {
     const { data } = await apiClient.get(API.LIBRARY.MY_LOANS, { params });
-    return data;
+    return normalizePaginated<BookLoan>(data);
   },
 
   async getOverdueLoans(params?: ListParams): Promise<PaginatedResponse<BookLoan>> {
     const { data } = await apiClient.get(API.LIBRARY.OVERDUE, { params });
-    return data;
+    return normalizePaginated<BookLoan>(data);
   },
 
-  async getLibraryStats(): Promise<any> {
+  async getLibraryStats(): Promise<LibraryStats> {
     const { data } = await apiClient.get(API.LIBRARY.STATS);
     return data;
   },
 
   async getRequests(params?: ListParams): Promise<PaginatedResponse<BookRequest>> {
     const { data } = await apiClient.get(API.LIBRARY.REQUESTS, { params });
-    return data;
+    return normalizePaginated<BookRequest>(data);
   },
 
   async createRequest(payload: CreateBookRequestTicket): Promise<BookRequest> {
